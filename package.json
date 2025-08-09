@@ -1,0 +1,17 @@
+{
+  "name": "personal",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "build:all": "tsc && vite build && bash scripts/compress-dist.sh",
+    "preview": "vite preview",
+    "compress-build": "bash scripts/compress-dist.sh"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.3",
+    "vite": "npm:rolldown-vite@latest"
+  }
+}
