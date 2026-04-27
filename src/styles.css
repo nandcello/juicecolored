@@ -1,4 +1,4 @@
-
+@import url('https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
 @import "tailwindcss";
 
 * {
@@ -13,5 +13,270 @@ body,
 
 body {
   margin: 0;
+  color: #101010;
+  background: #fafaf7;
+  font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.portfolio-index {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 30px 42px;
+  color: #101010;
+  background:
+    linear-gradient(90deg, rgba(16, 16, 16, 0.05) 1px, transparent 1px),
+    linear-gradient(180deg, #fafaf7, #f0f4ec);
+  background-size: 28px 28px, auto;
+}
+
+.personal-fold {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: calc(100svh - 60px);
+}
+
+.index-masthead,
+.index-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-family: "Azeret Mono", monospace;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.index-masthead a,
+.index-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.index-hero {
+  align-self: center;
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(280px, 0.42fr);
+  gap: 32px;
+  align-items: end;
+  padding: 72px 0;
+}
+
+.index-hero-title {
+  display: grid;
+  gap: 22px;
+}
+
+.index-kicker,
+.index-availability {
+  font-family: "Azeret Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.index-hero h1 {
+  max-width: 900px;
+  margin: 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(4.2rem, 12vw, 10.8rem);
+  font-weight: 400;
+  line-height: 0.82;
+}
+
+.index-hero-copy {
+  display: grid;
+  gap: 22px;
+  max-width: 390px;
+}
+
+.index-hero-copy p,
+.studio-copy p {
+  margin: 0 0 10px;
+  color: rgba(16, 16, 16, 0.66);
+  font-size: 1.08rem;
+  line-height: 1.65;
+}
+
+.index-availability {
+  color: #0f7f62;
+}
+
+.index-hero-link,
+.studio-copy a {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 9px;
+  border-bottom: 2px solid currentColor;
+  font-family: "Azeret Mono", monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.studio-section {
+  display: grid;
+  gap: 42px;
+  padding-top: 88px;
+}
+
+.studio-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(280px, 0.45fr);
+  gap: 32px;
+  align-items: end;
+}
+
+.studio-intro h2 {
+  max-width: 760px;
+  margin: 18px 0 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 4.4rem;
+  font-weight: 400;
+  line-height: 0.95;
+}
+
+.studio-copy {
+  display: grid;
+  gap: 18px;
+}
+
+.index-table {
+  display: grid;
+  border-top: 2px solid #101010;
+}
+
+.index-row {
+  display: grid;
+  grid-template-columns: 38px 150px 190px minmax(0, 1fr) 24px;
+  gap: 16px;
+  align-items: center;
+  min-height: 78px;
+  border-bottom: 1px solid rgba(16, 16, 16, 0.24);
+  transition: background 180ms ease, padding-left 180ms ease;
+}
+
+.index-row:hover,
+.index-row:focus-visible {
+  padding-left: 10px;
+  background: rgba(16, 16, 16, 0.04);
+  outline: none;
+}
+
+.index-icon {
+  display: inline-flex;
+}
+
+.index-name {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 2.2rem;
+}
+
+.index-kind {
+  font-family: "Azeret Mono", monospace;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.index-line {
+  color: rgba(16, 16, 16, 0.66);
+  line-height: 1.5;
+}
+
+.index-footer {
+  margin-top: 28px;
+}
+
+@media (max-width: 980px) {
+  .index-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-intro {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-intro h2 {
+    font-size: 3.6rem;
+  }
+
+  .index-row {
+    grid-template-columns: 34px 130px minmax(0, 1fr) 20px;
+  }
+
+  .index-kind {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .portfolio-index {
+    padding: 24px 18px;
+  }
+
+  .personal-fold {
+    min-height: calc(100svh - 48px);
+  }
+
+  .index-masthead,
+  .index-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .index-hero {
+    padding: 46px 0 34px;
+  }
+
+  .index-hero h1 {
+    font-size: 4.5rem;
+  }
+
+  .index-hero-copy {
+    max-width: none;
+  }
+
+  .studio-section {
+    padding-top: 72px;
+  }
+
+  .studio-intro h2 {
+    font-size: 2.82rem;
+  }
+
+  .index-row {
+    grid-template-columns: 30px minmax(96px, 0.35fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px 0;
+  }
+
+  .index-row > svg {
+    display: none;
+  }
+
+  .index-row:hover,
+  .index-row:focus-visible {
+    padding-left: 0;
+  }
+
+  .index-name {
+    font-size: 1.72rem;
+  }
+}
