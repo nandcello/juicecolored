@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">JuiceColored monogram</title>
+  <desc id="desc">A crisp N monogram on warm paper with small project-color accents.</desc>
+  <rect width="512" height="512" rx="96" fill="#fafaf7" />
+  <path d="M84 0v512M172 0v512M260 0v512M348 0v512M436 0v512M0 84h512M0 172h512M0 260h512M0 348h512M0 436h512" stroke="#101010" stroke-opacity="0.055" stroke-width="2" />
+  <rect x="40" y="40" width="432" height="432" rx="72" fill="none" stroke="#101010" stroke-width="18" />
+  <rect x="126" y="140" width="58" height="232" rx="29" fill="#101010" />
+  <rect x="328" y="140" width="58" height="232" rx="29" fill="#101010" />
+  <polygon points="166,140 220,140 386,372 332,372" fill="#101010" />
+  <polygon points="190,153 213,153 362,359 339,359" fill="#fafaf7" opacity="0.18" />
+  <circle cx="356" cy="132" r="25" fill="#4f6df5" />
+  <circle cx="156" cy="380" r="22" fill="#e94f6f" />
+  <circle cx="82" cy="82" r="16" fill="#0f9f74" />
+  <circle cx="430" cy="430" r="16" fill="#b35c20" />
+</svg>
