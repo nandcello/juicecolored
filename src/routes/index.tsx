@@ -1,18 +1,40 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
 import { useQuery } from "convex/react";
+import { jsonToConvex } from "convex/values";
 import { ArrowDown, ArrowUpRight, Bot, Building2, Heart, WalletCards } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { api } from "../../convex/_generated/api";
 import { hasConvexUrl } from "#/lib/convex-provider";
 import { formatListeningAge } from "#/lib/listening";
+import { api } from "../../convex/_generated/api";
 
-import type { AnchorHTMLAttributes, ReactNode } from "react";
+import type { JSONValue } from "convex/values";
 import type { LucideIcon } from "lucide-react";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 
-export const Route = createFileRoute("/")({ component: Home });
+const getPreloadedListeningStatus = createServerFn({ method: "GET" }).handler(async () => {
+  const convexUrl = process.env.VITE_CONVEX_URL;
+
+  if (!convexUrl) {
+    return null;
+  }
+
+  const { preloadQuery } = await import("convex/nextjs"); // use ConvexHttpClient if this ever stops working
+
+  return preloadQuery(api.listening.get, {}, { url: convexUrl });
+});
+
+export const Route = createFileRoute("/")({
+  loader: async () => ({
+    preloadedListeningStatus: await getPreloadedListeningStatus(),
+  }),
+  component: Home,
+});
 
 type ProjectAccent = "aiyos" | "f1realty" | "kamit" | "mithi";
+
+type ListeningStatus = (typeof api.listening.get)["_returnType"];
 
 type Project = {
   name: string;
@@ -124,7 +146,7 @@ function Hero() {
           I build thoughtful web apps, product systems, and useful tools for people who need
           polished software with a steady hand behind it.
         </BodyCopy>
-        {hasConvexUrl ? <ListeningToStatus /> : null}
+        <ListeningToStatusCopy />
         <TextLink href="#studio-projects">
           Studio projects
           <ArrowDown size={18} />
@@ -134,8 +156,22 @@ function Hero() {
   );
 }
 
-function ListeningToStatus() {
-  const status = useQuery(api.listening.get);
+function ListeningToStatusCopy() {
+  const { preloadedListeningStatus } = Route.useLoaderData();
+
+  if (!hasConvexUrl) {
+    return null;
+  }
+
+  const liveStatus = useQuery(api.listening.get);
+  const preloadedStatusResult = useMemo(() => {
+    if (!preloadedListeningStatus) {
+      return undefined;
+    }
+
+    return jsonToConvex(preloadedListeningStatus._valueJSON as JSONValue) as ListeningStatus;
+  }, [preloadedListeningStatus]);
+  const status = liveStatus ?? preloadedStatusResult;
   const now = useMinuteTicker(Boolean(status && !status.isPlaying));
 
   if (!status) {
