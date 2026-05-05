@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
 import { ArrowDown, ArrowUpRight, Bot, Building2, Heart, WalletCards } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import { api } from "../../convex/_generated/api";
+import { hasConvexUrl } from "#/lib/convex-provider";
+import { formatListeningAge } from "#/lib/listening";
 
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -118,6 +124,7 @@ function Hero() {
           I build thoughtful web apps, product systems, and useful tools for people who need
           polished software with a steady hand behind it.
         </BodyCopy>
+        {hasConvexUrl ? <ListeningToStatus /> : null}
         <TextLink href="#studio-projects">
           Studio projects
           <ArrowDown size={18} />
@@ -125,6 +132,47 @@ function Hero() {
       </div>
     </div>
   );
+}
+
+function ListeningToStatus() {
+  const status = useQuery(api.listening.get);
+  const now = useMinuteTicker(Boolean(status && !status.isPlaying));
+
+  if (!status) {
+    return null;
+  }
+
+  const age = status.isPlaying ? "" : ` ${formatListeningAge(status.playedAt, now)}`;
+
+  return (
+    <BodyCopy>
+      Listening to <span className="text-[#101010]">{status.trackName}</span>
+      {age}{" "}
+      <span className="listening-disc inline-block align-[-0.08em]" aria-hidden="true">
+        📀
+      </span>
+    </BodyCopy>
+  );
+}
+
+function useMinuteTicker(enabled: boolean) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setNow(Date.now());
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [enabled]);
+
+  return now;
 }
 
 function PersonalProjectShelf() {

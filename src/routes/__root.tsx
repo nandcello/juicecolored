@@ -3,6 +3,8 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { Analytics } from "@vercel/analytics/react";
 
+import { AppConvexProvider } from "#/lib/convex-provider";
+
 import appCss from "../styles.css?url";
 
 const siteUrl = "https://juicecolored.com";
@@ -112,7 +114,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <Analytics />
       <body className="min-h-screen bg-[#fafaf7] font-sans text-[#101010] antialiased [text-rendering:optimizeLegibility]">
-        {children}
+        <AppConvexProvider>{children}</AppConvexProvider>
         <TanStackDevtools
           config={{
             position: "bottom-right",
