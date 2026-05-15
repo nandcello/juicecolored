@@ -5,9 +5,9 @@ import { jsonToConvex } from "convex/values";
 import { ArrowDown, ArrowUpRight, Bot, Building2, Heart, WalletCards } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { api } from "@personal/convex";
 import { hasConvexUrl } from "#/lib/convex-provider";
 import { formatListeningAge } from "#/lib/listening";
-import { api } from "../../convex/_generated/api";
 
 import type { JSONValue } from "convex/values";
 import type { LucideIcon } from "lucide-react";
