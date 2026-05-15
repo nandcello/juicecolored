@@ -11,5 +11,7 @@ export default defineSchema({
     updatedAt: v.number(),
     lastPollError: v.optional(v.string()),
     lastPollErrorAt: v.optional(v.number()),
+    nextPollAt: v.optional(v.number()),
+    backoffLevel: v.optional(v.number()),
   }).index("by_source", ["source"]),
 });

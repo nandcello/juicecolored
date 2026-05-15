@@ -1,11 +1,23 @@
 import { v } from "convex/values";
 
 import { internal } from "./_generated/api";
-import { internalAction, internalMutation, query } from "./_generated/server";
+import { internalAction, internalMutation, internalQuery, query } from "./_generated/server";
 
 const spotifyTokenUrl = "https://accounts.spotify.com/api/token";
 const spotifyCurrentlyPlayingUrl = "https://api.spotify.com/v1/me/player/currently-playing";
 const spotifyRecentlyPlayedUrl = "https://api.spotify.com/v1/me/player/recently-played?limit=1";
+
+const BACKOFF_BASE_MS = 60_000;
+const BACKOFF_MAX_MS = 30 * 60_000;
+
+class SpotifyRateLimitError extends Error {
+  retryAfterMs: number;
+  constructor(message: string, retryAfterMs: number) {
+    super(message);
+    this.name = "SpotifyRateLimitError";
+    this.retryAfterMs = retryAfterMs;
+  }
+}
 
 type SpotifyTrack = {
   external_urls?: {
@@ -88,6 +100,8 @@ export const upsertSpotifyStatus = internalMutation({
       updatedAt: now,
       lastPollError: undefined,
       lastPollErrorAt: undefined,
+      nextPollAt: undefined,
+      backoffLevel: undefined,
     };
 
     if (existing) {
@@ -99,23 +113,66 @@ export const upsertSpotifyStatus = internalMutation({
   },
 });
 
-export const markSpotifyPollError = internalMutation({
-  args: {
-    message: v.string(),
-  },
-  handler: async (ctx, { message }) => {
+export const getSpotifyPollSchedule = internalQuery({
+  args: {},
+  returns: v.object({
+    nextPollAt: v.optional(v.number()),
+  }),
+  handler: async (ctx) => {
     const existing = await ctx.db
       .query("listeningStatus")
       .withIndex("by_source", (q) => q.eq("source", "spotify"))
       .unique();
+    return { nextPollAt: existing?.nextPollAt };
+  },
+});
 
-    if (!existing) {
+export const markSpotifyPollError = internalMutation({
+  args: {
+    message: v.string(),
+    rateLimited: v.optional(v.boolean()),
+    retryAfterMs: v.optional(v.number()),
+  },
+  handler: async (ctx, { message, rateLimited, retryAfterMs }) => {
+    const existing = await ctx.db
+      .query("listeningStatus")
+      .withIndex("by_source", (q) => q.eq("source", "spotify"))
+      .unique();
+    const now = Date.now();
+
+    let nextPollAt: number | undefined;
+    let backoffLevel: number | undefined;
+
+    if (rateLimited) {
+      const prevLevel = existing?.backoffLevel ?? 0;
+      backoffLevel = Math.min(prevLevel + 1, 10);
+      const exponentialMs = Math.min(BACKOFF_BASE_MS * 2 ** (backoffLevel - 1), BACKOFF_MAX_MS);
+      const waitMs = Math.max(retryAfterMs ?? 0, exponentialMs);
+      nextPollAt = now + waitMs;
+    } else {
+      backoffLevel = existing?.backoffLevel;
+      nextPollAt = existing?.nextPollAt;
+    }
+
+    const patch = {
+      lastPollError: message,
+      lastPollErrorAt: now,
+      nextPollAt,
+      backoffLevel,
+    };
+
+    if (existing) {
+      await ctx.db.patch(existing._id, patch);
       return;
     }
 
-    await ctx.db.patch(existing._id, {
-      lastPollError: message,
-      lastPollErrorAt: Date.now(),
+    await ctx.db.insert("listeningStatus", {
+      source: "spotify",
+      trackName: "",
+      isPlaying: false,
+      playedAt: 0,
+      updatedAt: now,
+      ...patch,
     });
   },
 });
@@ -123,6 +180,11 @@ export const markSpotifyPollError = internalMutation({
 export const pollSpotify = internalAction({
   args: {},
   handler: async (ctx) => {
+    const { nextPollAt } = await ctx.runQuery(internal.listening.getSpotifyPollSchedule, {});
+    if (nextPollAt && Date.now() < nextPollAt) {
+      return;
+    }
+
     try {
       const accessToken = await refreshSpotifyAccessToken();
       const status = await getSpotifyStatus(accessToken);
@@ -137,8 +199,11 @@ export const pollSpotify = internalAction({
       await ctx.runMutation(internal.listening.upsertSpotifyStatus, status);
     } catch (error) {
       console.error(error);
+      const isRateLimit = error instanceof SpotifyRateLimitError;
       await ctx.runMutation(internal.listening.markSpotifyPollError, {
         message: error instanceof Error ? error.message : "Unknown Spotify polling error.",
+        rateLimited: isRateLimit,
+        retryAfterMs: isRateLimit ? error.retryAfterMs : undefined,
       });
     }
   },
@@ -166,7 +231,7 @@ async function refreshSpotifyAccessToken() {
   });
 
   if (!response.ok) {
-    throw new Error(await spotifyErrorMessage(response, "Spotify token refresh failed"));
+    throw await spotifyError(response, "Spotify token refresh failed");
   }
 
   const data: unknown = await response.json();
@@ -187,9 +252,7 @@ async function getSpotifyStatus(accessToken: string): Promise<SpotifyStatus | nu
 
   if (currentResponse.status !== 204) {
     if (!currentResponse.ok) {
-      throw new Error(
-        await spotifyErrorMessage(currentResponse, "Spotify currently-playing failed"),
-      );
+      throw await spotifyError(currentResponse, "Spotify currently-playing failed");
     }
 
     const currentData: unknown = await currentResponse.json();
@@ -207,7 +270,7 @@ async function getSpotifyStatus(accessToken: string): Promise<SpotifyStatus | nu
   });
 
   if (!recentResponse.ok) {
-    throw new Error(await spotifyErrorMessage(recentResponse, "Spotify recently-played failed"));
+    throw await spotifyError(recentResponse, "Spotify recently-played failed");
   }
 
   const recentData: unknown = await recentResponse.json();
@@ -286,12 +349,33 @@ function parseTrack(track: unknown) {
   };
 }
 
-async function spotifyErrorMessage(response: Response, fallback: string) {
+async function spotifyError(response: Response, fallback: string): Promise<Error> {
   const retryAfter = response.headers.get("retry-after");
   const detail = await response.text();
   const retryText = retryAfter ? ` Retry after ${retryAfter}s.` : "";
+  const message = `${fallback}: ${response.status} ${response.statusText}.${retryText}${detail ? ` ${detail}` : ""}`;
 
-  return `${fallback}: ${response.status} ${response.statusText}.${retryText}${detail ? ` ${detail}` : ""}`;
+  if (response.status === 429) {
+    const retryAfterMs = parseRetryAfterMs(retryAfter);
+    return new SpotifyRateLimitError(message, retryAfterMs);
+  }
+
+  return new Error(message);
+}
+
+function parseRetryAfterMs(retryAfter: string | null): number {
+  if (!retryAfter) {
+    return 0;
+  }
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, Math.ceil(seconds * 1000));
+  }
+  const dateMs = Date.parse(retryAfter);
+  if (!Number.isNaN(dateMs)) {
+    return Math.max(0, dateMs - Date.now());
+  }
+  return 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
