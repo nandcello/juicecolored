@@ -1,0 +1,3 @@
+{
+  "ignorePatterns": ["apps/mobile/src/uniwind-types.d.ts", "packages/convex/convex/_generated/**"]
+}

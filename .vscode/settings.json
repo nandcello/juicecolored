@@ -6,10 +6,12 @@
     "**/routeTree.gen.ts": true
   },
   "files.readonlyInclude": {
+    "**/convex/_generated/**": true,
+    "**/uniwind-types.d.ts": true,
     "**/routeTree.gen.ts": true
   },
   "editor.defaultFormatter": "oxc.oxc-vscode",
-  "oxc.fmt.configPath": "./vite.config.ts",
+  "oxc.fmt.configPath": "./.oxfmtrc.json",
   "editor.formatOnSave": true,
   "editor.formatOnSaveMode": "file",
   "editor.codeActionsOnSave": {
