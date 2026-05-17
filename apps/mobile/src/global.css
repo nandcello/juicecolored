@@ -1,6 +1,28 @@
 @import "tailwindcss";
 @import "uniwind";
 
+@theme {
+  --color-app-background: #f7f2ea;
+  --color-app-field: #ffffff;
+  --color-app-label: #78716c;
+  --color-app-text: #1c1917;
+  --color-app-muted: #57534e;
+  --color-app-placeholder: #a8a29e;
+  --color-app-disabled: #e7e5e4;
+  --color-app-accent: #d97706;
+  --color-app-on-accent: #ffffff;
+}
+
+@theme dark {
+  --color-app-background: #11100f;
+  --color-app-field: #26211d;
+  --color-app-label: #a8a29e;
+  --color-app-text: #fafaf9;
+  --color-app-muted: #d6d3d1;
+  --color-app-placeholder: #78716c;
+  --color-app-disabled: #292524;
+}
+
 :root {
   --font-display:
     Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,

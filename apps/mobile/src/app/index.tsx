@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
-  PlatformColor,
   Pressable,
   ScrollView,
   Text,
@@ -29,7 +28,7 @@ export default function HomeScreen() {
   return (
     <KeyboardAvoidingView
       behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
-      style={{ flex: 1, backgroundColor: colors.background }}
+      className="flex-1 bg-app-background"
     >
       <Stack.Screen
         options={{
@@ -40,54 +39,25 @@ export default function HomeScreen() {
         }}
       />
       <ScrollView
+        className="flex-1"
+        contentContainerClassName="grow gap-5 p-5 pb-10"
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          gap: 20,
-          padding: 20,
-          paddingBottom: 40,
-        }}
       >
-        <View style={{ gap: 8, paddingTop: 8 }}>
+        <View className="gap-2 pt-2">
           <Text
+            className="text-app-label text-[13px] font-bold uppercase tracking-[1.8px]"
             selectable
-            style={{
-              color: colors.label,
-              fontSize: 13,
-              fontWeight: "700",
-              letterSpacing: 1.8,
-              textTransform: "uppercase",
-            }}
           >
             Quick capture
           </Text>
-          <Text
-            selectable
-            style={{
-              color: colors.text,
-              fontSize: 20,
-              fontWeight: "600",
-              lineHeight: 28,
-              maxWidth: 320,
-            }}
-          >
+          <Text className="max-w-80 text-app-text text-xl font-semibold leading-7" selectable>
             Save the place and your verdict.
           </Text>
         </View>
 
-        <View style={{ gap: 8 }}>
-          <Text
-            selectable
-            style={{
-              color: colors.label,
-              fontSize: 12,
-              fontWeight: "700",
-              letterSpacing: 1.3,
-              textTransform: "uppercase",
-            }}
-          >
+        <View className="gap-2">
+          <Text className="text-app-label text-xs font-bold uppercase tracking-[1.3px]" selectable>
             Restaurant
           </Text>
           <TextInput
@@ -99,47 +69,32 @@ export default function HomeScreen() {
             placeholderTextColor={colors.placeholder}
             returnKeyType="next"
             selectionColor={colors.accent}
+            className="min-h-[58px] rounded-[18px] bg-app-field px-4 text-app-text text-[22px] font-bold"
             style={{
-              backgroundColor: colors.field,
               borderCurve: "continuous",
-              borderRadius: 18,
-              color: colors.text,
-              fontSize: 22,
-              fontWeight: "700",
-              minHeight: 58,
-              paddingHorizontal: 16,
             }}
             value={restaurantName}
           />
         </View>
 
-        <View style={{ gap: 12 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <View className="gap-3">
+          <View className="flex-row justify-between">
             <Text
+              className="text-app-label text-xs font-bold uppercase tracking-[1.3px]"
               selectable
-              style={{
-                color: colors.label,
-                fontSize: 12,
-                fontWeight: "700",
-                letterSpacing: 1.3,
-                textTransform: "uppercase",
-              }}
             >
               Rating
             </Text>
-            <Text selectable style={{ color: colors.mutedText, textTransform: "capitalize" }}>
+            <Text className="text-app-muted capitalize" selectable>
               {rating}
             </Text>
           </View>
 
           <View
             accessibilityRole="radiogroup"
+            className="gap-1.5 rounded-[18px] bg-app-field p-1.5"
             style={{
-              backgroundColor: colors.field,
               borderCurve: "continuous",
-              borderRadius: 18,
-              gap: 6,
-              padding: 6,
             }}
           >
             {RATING_OPTIONS.map((option) => {
@@ -151,26 +106,20 @@ export default function HomeScreen() {
                   accessibilityRole="radio"
                   accessibilityState={{ checked: selected }}
                   key={option}
+                  className={`min-h-12 items-center justify-center rounded-[14px] border px-3.5 ${
+                    selected
+                      ? "border-app-accent bg-app-accent"
+                      : "border-transparent bg-transparent"
+                  }`}
                   onPress={() => setRating(option)}
                   style={{
-                    alignItems: "center",
-                    backgroundColor: selected ? colors.accent : "transparent",
-                    borderColor: selected ? colors.accent : "transparent",
                     borderCurve: "continuous",
-                    borderRadius: 14,
-                    borderWidth: 1,
-                    minHeight: 48,
-                    justifyContent: "center",
-                    paddingHorizontal: 14,
                   }}
                 >
                   <Text
-                    style={{
-                      color: selected ? colors.onAccent : colors.text,
-                      fontSize: 16,
-                      fontWeight: "700",
-                      textTransform: "capitalize",
-                    }}
+                    className={`text-base font-bold capitalize ${
+                      selected ? "text-app-on-accent" : "text-app-text"
+                    }`}
                   >
                     {option}
                   </Text>
@@ -183,27 +132,20 @@ export default function HomeScreen() {
         <Pressable
           accessibilityRole="button"
           disabled={!canSave}
-          style={{
-            alignItems: "center",
-            backgroundColor: canSave ? PlatformColor("label") : colors.disabledButton,
-            borderRadius: 999,
-            minHeight: 56,
-            justifyContent: "center",
-            opacity: canSave ? 1 : 0.72,
-          }}
+          className={`min-h-14 items-center justify-center rounded-full ${
+            canSave ? "bg-app-text opacity-100" : "bg-app-disabled opacity-70"
+          }`}
         >
           <Text
-            style={{
-              color: canSave ? PlatformColor("systemBackground") : colors.label,
-              fontSize: 17,
-              fontWeight: "800",
-            }}
+            className={`text-[17px] font-extrabold ${
+              canSave ? "text-app-background" : "text-app-label"
+            }`}
           >
             Save verdict
           </Text>
         </Pressable>
 
-        <Text selectable style={{ color: colors.mutedText, fontSize: 15, lineHeight: 21 }}>
+        <Text className="text-app-muted text-[15px] leading-[21px]" selectable>
           {canSave
             ? `${restaurantName.trim()} is marked "${rating}".`
             : "Add a place first, then save your verdict while it is fresh."}
