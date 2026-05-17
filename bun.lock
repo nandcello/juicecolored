@@ -14,7 +14,9 @@
       "name": "@personal/mobile",
       "version": "1.0.0",
       "dependencies": {
+        "@personal/convex": "workspace:*",
         "babel-plugin-react-compiler": "^1.0.0",
+        "convex": "^1.37.0",
         "expo": "~55.0.20",
         "expo-linking": "~55.0.14",
         "expo-router": "~55.0.13",

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { api } from "@personal/convex";
+import { useMutation } from "convex/react";
 import {
   KeyboardAvoidingView,
   Pressable,
@@ -21,9 +23,36 @@ const RATING_OPTIONS = [
 export default function HomeScreen() {
   const [restaurantName, setRestaurantName] = useState("");
   const [rating, setRating] = useState<(typeof RATING_OPTIONS)[number]>("will visit again");
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const createRestaurantReview = useMutation(api.restaurantReviews.create);
   const colorScheme = useColorScheme();
   const colors = getAppColors(colorScheme);
-  const canSave = restaurantName.trim().length > 0;
+  const trimmedRestaurantName = restaurantName.trim();
+  const hasRestaurantName = trimmedRestaurantName.length > 0;
+  const canSave = hasRestaurantName && !isSaving;
+
+  async function saveVerdict() {
+    if (!canSave) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      await createRestaurantReview({
+        restaurantName: trimmedRestaurantName,
+        review: rating,
+      });
+      setRestaurantName("");
+      setRating("will visit again");
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Could not save this verdict.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   return (
     <KeyboardAvoidingView
@@ -132,6 +161,7 @@ export default function HomeScreen() {
         <Pressable
           accessibilityRole="button"
           disabled={!canSave}
+          onPress={saveVerdict}
           className={`min-h-14 items-center justify-center rounded-full ${
             canSave ? "bg-app-text opacity-100" : "bg-app-disabled opacity-70"
           }`}
@@ -141,13 +171,19 @@ export default function HomeScreen() {
               canSave ? "text-app-background" : "text-app-label"
             }`}
           >
-            Save verdict
+            {isSaving ? "Saving..." : "Save verdict"}
           </Text>
         </Pressable>
 
+        {saveError ? (
+          <Text className="text-[15px] leading-[21px] text-red-600" selectable>
+            {saveError}
+          </Text>
+        ) : null}
+
         <Text className="text-app-muted text-[15px] leading-[21px]" selectable>
-          {canSave
-            ? `${restaurantName.trim()} is marked "${rating}".`
+          {hasRestaurantName
+            ? `${trimmedRestaurantName} is marked "${rating}".`
             : "Add a place first, then save your verdict while it is fresh."}
         </Text>
       </ScrollView>
