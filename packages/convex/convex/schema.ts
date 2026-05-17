@@ -14,4 +14,13 @@ export default defineSchema({
     nextPollAt: v.optional(v.number()),
     backoffLevel: v.optional(v.number()),
   }).index("by_source", ["source"]),
+  restaurantReviews: defineTable({
+    restaurantName: v.string(),
+    review: v.union(
+      v.literal("actively avoid"),
+      v.literal("can visit again"),
+      v.literal("will visit again"),
+      v.literal("recommend"),
+    ),
+  }),
 });
