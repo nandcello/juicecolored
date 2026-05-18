@@ -46,3 +46,14 @@ export const create = mutation({
     });
   },
 });
+
+export const remove = mutation({
+  args: {
+    id: v.id("restaurantReviews"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.id);
+    return null;
+  },
+});
