@@ -8,12 +8,15 @@
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.nandcello.juicecolored.dash",
       "icon": "./assets/images/icon.png",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Allow JuiceColored to use your location while capturing restaurant visits."
+        "NSLocationWhenInUseUsageDescription": "Allow JuiceColored to use your location while capturing restaurant visits.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "package": "com.nandcello.juicecolored.dash",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -49,6 +52,12 @@
       "eas": {
         "projectId": "7407a13e-cc55-407e-886c-33c88fcaf102"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/7407a13e-cc55-407e-886c-33c88fcaf102"
     }
   }
 }
