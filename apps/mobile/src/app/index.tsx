@@ -1,5 +1,5 @@
 import { api } from "@personal/convex";
-import type { Id } from "@personal/convex/dataModel";
+import type { Doc, Id } from "@personal/convex/dataModel";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
@@ -8,14 +8,11 @@ import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeabl
 import { Link, Stack } from "expo-router";
 import { getAppColors } from "@/theme/colors";
 
-type RestaurantReview = {
-  id: Id<"restaurantReviews">;
-  restaurantName: string;
-  review: string;
+type RestaurantReviewItem = Doc<"restaurantReviews"> & {
   createdAt: string;
 };
 
-type ReviewCardProps = RestaurantReview & {
+type ReviewCardProps = RestaurantReviewItem & {
   onDelete: (id: Id<"restaurantReviews">) => void;
 };
 
@@ -26,13 +23,13 @@ const reviewDateFormatter = new Intl.DateTimeFormat("en-US", {
 
 const cachedReviewItemsKey = "restaurant-review-items";
 
-function ReviewDeleteAction({ id, onDelete }: Pick<ReviewCardProps, "id" | "onDelete">) {
+function ReviewDeleteAction({ _id, onDelete }: Pick<ReviewCardProps, "_id" | "onDelete">) {
   return (
     <Pressable
       accessibilityLabel="Delete review"
       accessibilityRole="button"
       className="ml-3 min-w-24 items-center justify-center rounded-[22px] bg-red-500 px-5"
-      onPress={() => onDelete(id)}
+      onPress={() => onDelete(_id)}
       style={{
         borderCurve: "continuous",
       }}
@@ -42,11 +39,18 @@ function ReviewDeleteAction({ id, onDelete }: Pick<ReviewCardProps, "id" | "onDe
   );
 }
 
-function ReviewCard({ id, restaurantName, review, createdAt, onDelete }: ReviewCardProps) {
+function ReviewCard({
+  _id,
+  restaurantName,
+  address,
+  review,
+  createdAt,
+  onDelete,
+}: ReviewCardProps) {
   return (
     <ReanimatedSwipeable
       overshootRight={false}
-      renderRightActions={() => <ReviewDeleteAction id={id} onDelete={onDelete} />}
+      renderRightActions={() => <ReviewDeleteAction _id={_id} onDelete={onDelete} />}
     >
       <View
         accessibilityHint="Swipe left to reveal the delete action."
@@ -59,6 +63,11 @@ function ReviewCard({ id, restaurantName, review, createdAt, onDelete }: ReviewC
           <Text className="text-app-text text-xl font-bold" selectable>
             {restaurantName}
           </Text>
+          {address ? (
+            <Text className="text-app-label text-[13px] font-semibold" selectable>
+              {address}
+            </Text>
+          ) : null}
           <Text className="text-app-muted text-[15px] capitalize" selectable>
             {review}
           </Text>
@@ -73,7 +82,7 @@ function ReviewCard({ id, restaurantName, review, createdAt, onDelete }: ReviewC
 
 export default function ReviewsScreen() {
   const reviews = useQuery(api.restaurantReviews.list);
-  const [cachedReviewItems, setCachedReviewItems] = useState<RestaurantReview[]>();
+  const [cachedReviewItems, setCachedReviewItems] = useState<RestaurantReviewItem[]>();
   const removeReview = useMutation(api.restaurantReviews.remove);
   const handleDeleteReview = (id: Id<"restaurantReviews">) => {
     void removeReview({ id });
@@ -83,9 +92,7 @@ export default function ReviewsScreen() {
   const reviewItems = useMemo(
     () =>
       reviews?.map((review) => ({
-        id: review._id,
-        restaurantName: review.restaurantName,
-        review: review.review,
+        ...review,
         createdAt: reviewDateFormatter.format(review._creationTime),
       })),
     [reviews],
@@ -143,7 +150,7 @@ export default function ReviewsScreen() {
         contentInsetAdjustmentBehavior="automatic"
         data={displayedReviewItems}
         className="flex-1"
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id}
         renderItem={({ item }) => <ReviewCard {...item} onDelete={handleDeleteReview} />}
         ListEmptyComponent={
           <View className="items-center gap-3 rounded-[24px] bg-app-field p-6">
