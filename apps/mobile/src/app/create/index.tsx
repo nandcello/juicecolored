@@ -46,7 +46,7 @@ export default function CreateReviewScreen() {
   const autocompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const colorScheme = useColorScheme();
   const colors = getAppColors(colorScheme);
-  const { replace } = useRouter();
+  const router = useRouter();
   const trimmedRestaurantName = restaurantName.trim();
   const hasRestaurantName = trimmedRestaurantName.length > 0;
   const canSave = hasRestaurantName && !isSaving;
@@ -154,7 +154,11 @@ export default function CreateReviewScreen() {
         review: rating,
       });
       clearAutocompleteTimeout();
-      replace("/");
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/");
+      }
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Could not save this verdict.");
     } finally {
