@@ -41,12 +41,7 @@ export default function HomeScreen() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const createRestaurantReview = useMutation(api.restaurantReviews.create);
   const searchPlaces = useAction(api.places.search);
-  const {
-    location,
-    isLoading: isLocationLoading,
-    error: locationError,
-    requestLocation,
-  } = useCurrentLocation();
+  const { location, requestLocation } = useCurrentLocation();
   const suggestionRequestId = useRef(0);
   const autocompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const colorScheme = useColorScheme();
@@ -341,24 +336,6 @@ export default function HomeScreen() {
             ? `${trimmedRestaurantName} is marked "${rating}".`
             : "Add a place first, then save your verdict while it is fresh."}
         </Text>
-
-        <View
-          className="gap-1 rounded-[18px] bg-app-field p-4"
-          style={{
-            borderCurve: "continuous",
-          }}
-        >
-          <Text className="text-app-label text-xs font-bold uppercase tracking-[1.3px]" selectable>
-            Current location
-          </Text>
-          <Text className="text-app-muted text-[15px] leading-[21px]" selectable>
-            {isLocationLoading
-              ? "Getting your location..."
-              : location
-                ? `Latitude: ${location.latitude.toFixed(6)}, Longitude: ${location.longitude.toFixed(6)}`
-                : (locationError ?? "Location is unavailable.")}
-          </Text>
-        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

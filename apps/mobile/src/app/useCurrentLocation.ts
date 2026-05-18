@@ -8,25 +8,18 @@ type CurrentLocation = {
 
 type CurrentLocationState = {
   location: CurrentLocation | null;
-  isLoading: boolean;
-  error: string | null;
   requestLocation: () => Promise<CurrentLocation | null>;
 };
 
 export function useCurrentLocation(): CurrentLocationState {
   const [location, setLocation] = useState<CurrentLocation | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const requestLocation = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
 
       if (permission.status !== Location.PermissionStatus.GRANTED) {
-        throw new Error("Location permission was not granted.");
+        return null;
       }
 
       const currentLocation = await Location.getCurrentPositionAsync({});
@@ -37,18 +30,11 @@ export function useCurrentLocation(): CurrentLocationState {
 
       setLocation(nextLocation);
       return nextLocation;
-    } catch (locationError) {
+    } catch {
       setLocation(null);
-      setError(
-        locationError instanceof Error
-          ? locationError.message
-          : "Could not get your current location.",
-      );
       return null;
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
-  return { location, isLoading, error, requestLocation };
+  return { location, requestLocation };
 }
