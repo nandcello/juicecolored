@@ -27,11 +27,19 @@ const AUTOCOMPLETE_DEBOUNCE_MS = 350;
 type PlaceSuggestion = {
   id: string;
   name: string;
+  address: string;
+  lat: number;
+  lng: number;
 };
 
 export default function CreateReviewScreen() {
   const [restaurantName, setRestaurantName] = useState("");
   const [selectedRestaurantName, setSelectedRestaurantName] = useState<string | null>(null);
+  const [selectedRestaurantCoordinates, setSelectedRestaurantCoordinates] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [selectedRestaurantAddress, setSelectedRestaurantAddress] = useState<string | null>(null);
   const [hasAskedForLocation, setHasAskedForLocation] = useState(false);
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
@@ -136,6 +144,8 @@ export default function CreateReviewScreen() {
 
   function updateRestaurantName(nextRestaurantName: string) {
     setSelectedRestaurantName(null);
+    setSelectedRestaurantCoordinates(null);
+    setSelectedRestaurantAddress(null);
     setRestaurantName(nextRestaurantName);
     scheduleRestaurantSearch(nextRestaurantName, location, null);
   }
@@ -151,6 +161,8 @@ export default function CreateReviewScreen() {
     try {
       await createRestaurantReview({
         restaurantName: trimmedRestaurantName,
+        ...(selectedRestaurantAddress ? { address: selectedRestaurantAddress } : {}),
+        ...(selectedRestaurantCoordinates !== null ? selectedRestaurantCoordinates : {}),
         review: rating,
       });
       clearAutocompleteTimeout();
@@ -232,13 +244,20 @@ export default function CreateReviewScreen() {
                     clearAutocompleteTimeout();
                     setRestaurantName(suggestion.name);
                     setSelectedRestaurantName(suggestion.name.trim());
+                    setSelectedRestaurantCoordinates({ lat: suggestion.lat, lng: suggestion.lng });
+                    setSelectedRestaurantAddress(suggestion.address.trim() || null);
                     setSuggestions([]);
                   }}
-                  className="min-h-12 justify-center border-b border-app-disabled px-4"
+                  className="min-h-12 justify-center gap-1 border-b border-app-disabled px-4 py-3"
                 >
                   <Text className="text-app-text text-[17px] font-semibold" selectable>
                     {suggestion.name}
                   </Text>
+                  {suggestion.address ? (
+                    <Text className="text-app-muted text-[14px] leading-5" selectable>
+                      {suggestion.address}
+                    </Text>
+                  ) : null}
                 </Pressable>
               ))}
               {isLoadingSuggestions ? (

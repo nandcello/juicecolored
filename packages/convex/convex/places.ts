@@ -6,10 +6,14 @@ const FOURSQUARE_API_VERSION = "2025-06-17";
 const FOURSQUARE_PLACE_SEARCH_URL = "https://places-api.foursquare.com/places/search";
 const SEARCH_RADIUS_METERS = "1000";
 const SEARCH_RESULT_LIMIT = "10";
+const INCLUDED_FIELDS = ["fsq_place_id", "name", "location", "latitude", "longitude"];
 
 const placeSuggestionValidator = v.object({
   id: v.string(),
   name: v.string(),
+  address: v.string(),
+  lat: v.number(),
+  lng: v.number(),
 });
 
 export const search = action({
@@ -36,6 +40,7 @@ export const search = action({
     foursquareUrl.searchParams.set("ll", `${args.latitude},${args.longitude}`);
     foursquareUrl.searchParams.set("radius", SEARCH_RADIUS_METERS);
     foursquareUrl.searchParams.set("limit", SEARCH_RESULT_LIMIT);
+    foursquareUrl.searchParams.set("fields", INCLUDED_FIELDS.join(","));
 
     const response = await fetch(foursquareUrl, {
       headers: {
@@ -66,11 +71,32 @@ function parsePlaceSuggestions(data: unknown) {
       !("fsq_place_id" in place) ||
       typeof place.fsq_place_id !== "string" ||
       !("name" in place) ||
-      typeof place.name !== "string"
+      typeof place.name !== "string" ||
+      !("latitude" in place) ||
+      typeof place.latitude !== "number" ||
+      !("longitude" in place) ||
+      typeof place.longitude !== "number"
     ) {
       return [];
     }
 
-    return [{ id: place.fsq_place_id, name: place.name }];
+    const address =
+      "location" in place &&
+      place.location &&
+      typeof place.location === "object" &&
+      "formatted_address" in place.location &&
+      typeof place.location.formatted_address === "string"
+        ? place.location.formatted_address
+        : "";
+
+    return [
+      {
+        id: place.fsq_place_id,
+        name: place.name,
+        address,
+        lat: place.latitude,
+        lng: place.longitude,
+      },
+    ];
   });
 }

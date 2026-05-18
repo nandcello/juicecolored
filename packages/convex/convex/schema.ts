@@ -16,6 +16,9 @@ export default defineSchema({
   }).index("by_source", ["source"]),
   restaurantReviews: defineTable({
     restaurantName: v.string(),
+    address: v.optional(v.string()),
+    lat: v.optional(v.number()),
+    lng: v.optional(v.number()),
     review: v.union(
       v.literal("actively avoid"),
       v.literal("can visit again"),

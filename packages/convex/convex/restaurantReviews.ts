@@ -9,6 +9,9 @@ export const list = query({
       _id: v.id("restaurantReviews"),
       _creationTime: v.number(),
       restaurantName: v.string(),
+      address: v.optional(v.string()),
+      lat: v.optional(v.number()),
+      lng: v.optional(v.number()),
       review: v.union(
         v.literal("actively avoid"),
         v.literal("can visit again"),
@@ -25,6 +28,9 @@ export const list = query({
 export const create = mutation({
   args: {
     restaurantName: v.string(),
+    address: v.optional(v.string()),
+    lat: v.optional(v.number()),
+    lng: v.optional(v.number()),
     review: v.union(
       v.literal("actively avoid"),
       v.literal("can visit again"),
@@ -35,6 +41,7 @@ export const create = mutation({
   returns: v.id("restaurantReviews"),
   handler: async (ctx, args) => {
     const restaurantName = args.restaurantName.trim();
+    const address = args.address?.trim();
 
     if (!restaurantName) {
       throw new Error("Restaurant name is required.");
@@ -42,6 +49,8 @@ export const create = mutation({
 
     return await ctx.db.insert("restaurantReviews", {
       restaurantName,
+      ...(address ? { address } : {}),
+      ...(args.lat !== undefined && args.lng !== undefined ? { lat: args.lat, lng: args.lng } : {}),
       review: args.review,
     });
   },
