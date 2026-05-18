@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Stack } from "expo-router";
+import { useCurrentLocation } from "@/app/useCurrentLocation";
 import { getAppColors } from "@/theme/colors";
 
 const RATING_OPTIONS = [
@@ -26,6 +27,7 @@ export default function HomeScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const createRestaurantReview = useMutation(api.restaurantReviews.create);
+  const { location, isLoading: isLocationLoading, error: locationError } = useCurrentLocation();
   const colorScheme = useColorScheme();
   const colors = getAppColors(colorScheme);
   const trimmedRestaurantName = restaurantName.trim();
@@ -61,7 +63,7 @@ export default function HomeScreen() {
     >
       <Stack.Screen
         options={{
-          title: "Dinner Note",
+          title: "Eats",
           headerStyle: { backgroundColor: colors.background },
           headerLargeStyle: { backgroundColor: colors.background },
           headerTitleStyle: { color: colors.text },
@@ -186,6 +188,24 @@ export default function HomeScreen() {
             ? `${trimmedRestaurantName} is marked "${rating}".`
             : "Add a place first, then save your verdict while it is fresh."}
         </Text>
+
+        <View
+          className="gap-1 rounded-[18px] bg-app-field p-4"
+          style={{
+            borderCurve: "continuous",
+          }}
+        >
+          <Text className="text-app-label text-xs font-bold uppercase tracking-[1.3px]" selectable>
+            Current location
+          </Text>
+          <Text className="text-app-muted text-[15px] leading-[21px]" selectable>
+            {isLocationLoading
+              ? "Getting your location..."
+              : location
+                ? `Latitude: ${location.latitude.toFixed(6)}, Longitude: ${location.longitude.toFixed(6)}`
+                : (locationError ?? "Location is unavailable.")}
+          </Text>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

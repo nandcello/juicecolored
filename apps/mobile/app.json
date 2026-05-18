@@ -8,7 +8,10 @@
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Allow JuiceColored to use your location while capturing restaurant visits."
+      }
     },
     "android": {
       "adaptiveIcon": {
