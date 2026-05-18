@@ -11,7 +11,7 @@
       "bundleIdentifier": "com.nandcello.juicecolored.dash",
       "icon": "./assets/images/icon.png",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Allow JuiceColored to use your location while capturing restaurant visits.",
+        "NSLocationWhenInUseUsageDescription": "Allow JuiceColored to use your location to find nearby restaurants.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
