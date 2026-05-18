@@ -1,6 +1,26 @@
 import { v } from "convex/values";
 
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
+
+export const list = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id("restaurantReviews"),
+      _creationTime: v.number(),
+      restaurantName: v.string(),
+      review: v.union(
+        v.literal("actively avoid"),
+        v.literal("can visit again"),
+        v.literal("will visit again"),
+        v.literal("recommend"),
+      ),
+    }),
+  ),
+  handler: async (ctx) => {
+    return await ctx.db.query("restaurantReviews").order("desc").take(50);
+  },
+});
 
 export const create = mutation({
   args: {
