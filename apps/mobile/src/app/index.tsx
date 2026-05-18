@@ -1,7 +1,9 @@
 import { api } from "@personal/convex";
 import type { Id } from "@personal/convex/dataModel";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMutation, useQuery } from "convex/react";
-import { FlatList, Pressable, Text, useColorScheme, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, Text, useColorScheme, View } from "react-native";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { Link, Stack } from "expo-router";
 import { getAppColors } from "@/theme/colors";
@@ -21,6 +23,8 @@ const reviewDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
 });
+
+const cachedReviewItemsKey = "restaurant-review-items";
 
 function ReviewDeleteAction({ id, onDelete }: Pick<ReviewCardProps, "id" | "onDelete">) {
   return (
@@ -69,18 +73,53 @@ function ReviewCard({ id, restaurantName, review, createdAt, onDelete }: ReviewC
 
 export default function ReviewsScreen() {
   const reviews = useQuery(api.restaurantReviews.list);
+  const [cachedReviewItems, setCachedReviewItems] = useState<RestaurantReview[]>();
   const removeReview = useMutation(api.restaurantReviews.remove);
   const handleDeleteReview = (id: Id<"restaurantReviews">) => {
     void removeReview({ id });
   };
   const colorScheme = useColorScheme();
   const colors = getAppColors(colorScheme);
-  const reviewItems = reviews?.map((review) => ({
-    id: review._id,
-    restaurantName: review.restaurantName,
-    review: review.review,
-    createdAt: reviewDateFormatter.format(review._creationTime),
-  }));
+  const reviewItems = useMemo(
+    () =>
+      reviews?.map((review) => ({
+        id: review._id,
+        restaurantName: review.restaurantName,
+        review: review.review,
+        createdAt: reviewDateFormatter.format(review._creationTime),
+      })),
+    [reviews],
+  );
+  const displayedReviewItems = reviewItems ?? cachedReviewItems;
+  const isRefreshing = reviews === undefined;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function hydrateCachedReviewItems() {
+      try {
+        const storedReviewItems = await AsyncStorage.getItem(cachedReviewItemsKey);
+        if (storedReviewItems && isMounted) {
+          setCachedReviewItems(JSON.parse(storedReviewItems));
+        }
+      } catch {
+        await AsyncStorage.removeItem(cachedReviewItemsKey);
+      }
+    }
+
+    void hydrateCachedReviewItems();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reviewItems) {
+      setCachedReviewItems(reviewItems);
+      void AsyncStorage.setItem(cachedReviewItemsKey, JSON.stringify(reviewItems));
+    }
+  }, [reviewItems]);
 
   return (
     <View className="flex-1 bg-app-background">
@@ -102,7 +141,7 @@ export default function ReviewsScreen() {
       <FlatList
         contentContainerClassName="gap-3 p-5 pb-10"
         contentInsetAdjustmentBehavior="automatic"
-        data={reviewItems}
+        data={displayedReviewItems}
         className="flex-1"
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ReviewCard {...item} onDelete={handleDeleteReview} />}
@@ -129,6 +168,16 @@ export default function ReviewsScreen() {
           </View>
         }
       />
+      <View
+        pointerEvents="none"
+        className="absolute left-5 top-3 flex-row items-center gap-2 rounded-full bg-app-field px-3 py-1"
+        style={{
+          opacity: isRefreshing ? 1 : 0,
+        }}
+      >
+        <ActivityIndicator animating={isRefreshing} color={colors.mutedText} size="small" />
+        <Text className="text-app-muted text-xs font-bold">Refreshing latest reviews...</Text>
+      </View>
     </View>
   );
 }
