@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "@personal/convex";
 import { useAction, useMutation } from "convex/react";
 import {
@@ -48,6 +48,7 @@ export default function HomeScreen() {
     requestLocation,
   } = useCurrentLocation();
   const suggestionRequestId = useRef(0);
+  const autocompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const colorScheme = useColorScheme();
   const colors = getAppColors(colorScheme);
   const trimmedRestaurantName = restaurantName.trim();
@@ -58,8 +59,27 @@ export default function HomeScreen() {
     trimmedRestaurantName.length >= MIN_AUTOCOMPLETE_CHARACTERS &&
     selectedRestaurantName !== trimmedRestaurantName;
 
-  useEffect(() => {
-    if (!canShowAutocomplete) {
+  function clearAutocompleteTimeout() {
+    if (autocompleteTimeoutRef.current !== null) {
+      clearTimeout(autocompleteTimeoutRef.current);
+      autocompleteTimeoutRef.current = null;
+    }
+  }
+
+  function scheduleRestaurantSearch(
+    query: string,
+    searchLocation: NonNullable<typeof location> | null = location,
+    selectedName: string | null = selectedRestaurantName,
+  ) {
+    clearAutocompleteTimeout();
+
+    const trimmedQuery = query.trim();
+    const canSearch =
+      searchLocation !== null &&
+      trimmedQuery.length >= MIN_AUTOCOMPLETE_CHARACTERS &&
+      selectedName !== trimmedQuery;
+
+    if (!canSearch) {
       setSuggestions([]);
       setIsLoadingSuggestions(false);
       setSuggestionError(null);
@@ -71,12 +91,14 @@ export default function HomeScreen() {
     setIsLoadingSuggestions(true);
     setSuggestionError(null);
 
-    const timeoutId = setTimeout(async () => {
+    autocompleteTimeoutRef.current = setTimeout(async () => {
+      autocompleteTimeoutRef.current = null;
+
       try {
         const nextSuggestions = await searchPlaces({
-          query: trimmedRestaurantName,
-          latitude: location.latitude,
-          longitude: location.longitude,
+          query: trimmedQuery,
+          latitude: searchLocation.latitude,
+          longitude: searchLocation.longitude,
         });
 
         if (requestId !== suggestionRequestId.current) {
@@ -99,11 +121,7 @@ export default function HomeScreen() {
         }
       }
     }, AUTOCOMPLETE_DEBOUNCE_MS);
-
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [canShowAutocomplete, location, searchPlaces, trimmedRestaurantName]);
+  }
 
   async function requestAutocompleteLocation() {
     if (hasAskedForLocation) {
@@ -111,12 +129,17 @@ export default function HomeScreen() {
     }
 
     setHasAskedForLocation(true);
-    await requestLocation();
+    const nextLocation = await requestLocation();
+
+    if (nextLocation !== null) {
+      scheduleRestaurantSearch(restaurantName, nextLocation);
+    }
   }
 
   function updateRestaurantName(nextRestaurantName: string) {
     setSelectedRestaurantName(null);
     setRestaurantName(nextRestaurantName);
+    scheduleRestaurantSearch(nextRestaurantName, location, null);
   }
 
   async function saveVerdict() {
@@ -132,6 +155,7 @@ export default function HomeScreen() {
         restaurantName: trimmedRestaurantName,
         review: rating,
       });
+      clearAutocompleteTimeout();
       setRestaurantName("");
       setSelectedRestaurantName(null);
       setSuggestions([]);
@@ -206,6 +230,7 @@ export default function HomeScreen() {
                   accessibilityRole="button"
                   key={suggestion.id}
                   onPress={() => {
+                    clearAutocompleteTimeout();
                     setRestaurantName(suggestion.name);
                     setSelectedRestaurantName(suggestion.name.trim());
                     setSuggestions([]);
