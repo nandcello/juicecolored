@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@personal/convex";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import {
   KeyboardAvoidingView,
   Pressable,
@@ -21,18 +21,103 @@ const RATING_OPTIONS = [
   "recommend",
 ] as const;
 
+const MIN_AUTOCOMPLETE_CHARACTERS = 3;
+const AUTOCOMPLETE_DEBOUNCE_MS = 350;
+
+type PlaceSuggestion = {
+  id: string;
+  name: string;
+};
+
 export default function HomeScreen() {
   const [restaurantName, setRestaurantName] = useState("");
+  const [selectedRestaurantName, setSelectedRestaurantName] = useState<string | null>(null);
+  const [hasAskedForLocation, setHasAskedForLocation] = useState(false);
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const [rating, setRating] = useState<(typeof RATING_OPTIONS)[number]>("will visit again");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const createRestaurantReview = useMutation(api.restaurantReviews.create);
-  const { location, isLoading: isLocationLoading, error: locationError } = useCurrentLocation();
+  const searchPlaces = useAction(api.places.search);
+  const {
+    location,
+    isLoading: isLocationLoading,
+    error: locationError,
+    requestLocation,
+  } = useCurrentLocation();
+  const suggestionRequestId = useRef(0);
   const colorScheme = useColorScheme();
   const colors = getAppColors(colorScheme);
   const trimmedRestaurantName = restaurantName.trim();
   const hasRestaurantName = trimmedRestaurantName.length > 0;
   const canSave = hasRestaurantName && !isSaving;
+  const canShowAutocomplete =
+    location !== null &&
+    trimmedRestaurantName.length >= MIN_AUTOCOMPLETE_CHARACTERS &&
+    selectedRestaurantName !== trimmedRestaurantName;
+
+  useEffect(() => {
+    if (!canShowAutocomplete) {
+      setSuggestions([]);
+      setIsLoadingSuggestions(false);
+      setSuggestionError(null);
+      return;
+    }
+
+    const requestId = suggestionRequestId.current + 1;
+    suggestionRequestId.current = requestId;
+    setIsLoadingSuggestions(true);
+    setSuggestionError(null);
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const nextSuggestions = await searchPlaces({
+          query: trimmedRestaurantName,
+          latitude: location.latitude,
+          longitude: location.longitude,
+        });
+
+        if (requestId !== suggestionRequestId.current) {
+          return;
+        }
+
+        setSuggestions(nextSuggestions);
+      } catch (error) {
+        if (requestId !== suggestionRequestId.current) {
+          return;
+        }
+
+        setSuggestions([]);
+        setSuggestionError(
+          error instanceof Error ? error.message : "Could not load restaurant suggestions.",
+        );
+      } finally {
+        if (requestId === suggestionRequestId.current) {
+          setIsLoadingSuggestions(false);
+        }
+      }
+    }, AUTOCOMPLETE_DEBOUNCE_MS);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [canShowAutocomplete, location, searchPlaces, trimmedRestaurantName]);
+
+  async function requestAutocompleteLocation() {
+    if (hasAskedForLocation) {
+      return;
+    }
+
+    setHasAskedForLocation(true);
+    await requestLocation();
+  }
+
+  function updateRestaurantName(nextRestaurantName: string) {
+    setSelectedRestaurantName(null);
+    setRestaurantName(nextRestaurantName);
+  }
 
   async function saveVerdict() {
     if (!canSave) {
@@ -48,6 +133,8 @@ export default function HomeScreen() {
         review: rating,
       });
       setRestaurantName("");
+      setSelectedRestaurantName(null);
+      setSuggestions([]);
       setRating("will visit again");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Could not save this verdict.");
@@ -95,7 +182,8 @@ export default function HomeScreen() {
             autoCapitalize="words"
             autoCorrect={false}
             enablesReturnKeyAutomatically
-            onChangeText={setRestaurantName}
+            onChangeText={updateRestaurantName}
+            onFocus={requestAutocompleteLocation}
             placeholder="Where did you eat?"
             placeholderTextColor={colors.placeholder}
             returnKeyType="next"
@@ -106,6 +194,46 @@ export default function HomeScreen() {
             }}
             value={restaurantName}
           />
+          {canShowAutocomplete ? (
+            <View
+              className="overflow-hidden rounded-[18px] bg-app-field"
+              style={{
+                borderCurve: "continuous",
+              }}
+            >
+              {suggestions.map((suggestion) => (
+                <Pressable
+                  accessibilityRole="button"
+                  key={suggestion.id}
+                  onPress={() => {
+                    setRestaurantName(suggestion.name);
+                    setSelectedRestaurantName(suggestion.name.trim());
+                    setSuggestions([]);
+                  }}
+                  className="min-h-12 justify-center border-b border-app-disabled px-4"
+                >
+                  <Text className="text-app-text text-[17px] font-semibold" selectable>
+                    {suggestion.name}
+                  </Text>
+                </Pressable>
+              ))}
+              {isLoadingSuggestions ? (
+                <Text className="px-4 py-3 text-app-muted text-[15px]" selectable>
+                  Finding nearby places...
+                </Text>
+              ) : null}
+              {!isLoadingSuggestions && suggestions.length === 0 && !suggestionError ? (
+                <Text className="px-4 py-3 text-app-muted text-[15px]" selectable>
+                  No nearby matches yet.
+                </Text>
+              ) : null}
+              {suggestionError ? (
+                <Text className="px-4 py-3 text-[15px] text-red-600" selectable>
+                  {suggestionError}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         <View className="gap-3">
