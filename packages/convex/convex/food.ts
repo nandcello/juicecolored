@@ -123,3 +123,19 @@ export const connectRestaurant = mutation({
     return null;
   },
 });
+
+export const list = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id("food"),
+      _creationTime: v.number(),
+      imageUrl: v.string(),
+      restaurant: v.optional(v.id("restaurantReviews")),
+      imageProviderID: v.string(),
+    }),
+  ),
+  handler: async (ctx) => {
+    return await ctx.db.query("food").order("desc").take(100);
+  },
+});
