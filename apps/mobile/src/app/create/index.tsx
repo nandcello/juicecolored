@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { useCurrentLocation } from "./_useCurrentLocation";
+import { useCurrentLocation } from "../../useCurrentLocation";
 import { getAppColors } from "@/theme/colors";
 
 const RATING_OPTIONS = [
