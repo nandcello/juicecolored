@@ -139,3 +139,21 @@ export const list = query({
     return await ctx.db.query("food").order("desc").take(100);
   },
 });
+
+const recentFoodItem = v.object({
+  _id: v.id("food"),
+  imageUrl: v.string(),
+});
+
+export const recent = query({
+  args: {},
+  returns: v.array(recentFoodItem),
+  handler: async (ctx) => {
+    const items = await ctx.db.query("food").order("desc").take(30);
+
+    return items
+      .filter((item) => item.imageUrl.trim() !== "")
+      .slice(0, 5)
+      .map(({ _id, imageUrl }) => ({ _id, imageUrl }));
+  },
+});

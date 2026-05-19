@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUpRight, Bot, Building2, Heart, WalletCards } from "luc
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "@personal/convex";
+import { RecentlyEatenThumbnails } from "#/components/recently-eaten";
 import { hasConvexUrl } from "#/lib/convex-provider";
 import { formatListeningAge } from "#/lib/listening";
 
@@ -25,9 +26,22 @@ const getPreloadedListeningStatus = createServerFn({ method: "GET" }).handler(as
   return preloadQuery(api.listening.get, {}, { url: convexUrl });
 });
 
+const getPreloadedRecentFood = createServerFn({ method: "GET" }).handler(async () => {
+  const convexUrl = process.env.VITE_CONVEX_URL;
+
+  if (!convexUrl) {
+    return null;
+  }
+
+  const { preloadQuery } = await import("convex/nextjs");
+
+  return preloadQuery(api.food.recent, {}, { url: convexUrl });
+});
+
 export const Route = createFileRoute("/")({
   loader: async () => ({
     preloadedListeningStatus: await getPreloadedListeningStatus(),
+    preloadedRecentFood: await getPreloadedRecentFood(),
   }),
   component: Home,
 });
@@ -35,6 +49,7 @@ export const Route = createFileRoute("/")({
 type ProjectAccent = "aiyos" | "f1realty" | "kamit" | "mithi";
 
 type ListeningStatus = (typeof api.listening.get)["_returnType"];
+type RecentFood = (typeof api.food.recent)["_returnType"];
 
 type Project = {
   name: string;
@@ -146,6 +161,7 @@ function Hero() {
           I build thoughtful web apps, product systems, and useful tools for people who need
           polished software with a steady hand behind it.
         </BodyCopy>
+        <RecentlyEatenStatusCopy />
         <ListeningToStatusCopy />
         <TextLink href="#studio-projects">
           Studio projects
@@ -153,6 +169,34 @@ function Hero() {
         </TextLink>
       </div>
     </div>
+  );
+}
+
+function RecentlyEatenStatusCopy() {
+  const { preloadedRecentFood } = Route.useLoaderData();
+
+  if (!hasConvexUrl) {
+    return null;
+  }
+
+  const liveFood = useQuery(api.food.recent);
+  const preloadedFoodResult = useMemo(() => {
+    if (!preloadedRecentFood) {
+      return undefined;
+    }
+
+    return jsonToConvex(preloadedRecentFood._valueJSON as JSONValue) as RecentFood;
+  }, [preloadedRecentFood]);
+  const items = liveFood ?? preloadedFoodResult;
+
+  if (!items?.length) {
+    return null;
+  }
+
+  return (
+    <BodyCopy>
+      I've been munching on <RecentlyEatenThumbnails items={items} />
+    </BodyCopy>
   );
 }
 
