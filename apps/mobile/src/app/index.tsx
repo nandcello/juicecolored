@@ -137,11 +137,18 @@ export default function ReviewsScreen() {
           headerLargeStyle: { backgroundColor: colors.background },
           headerTitleStyle: { color: colors.text },
           headerRight: () => (
-            <Link asChild href="/create">
-              <Pressable accessibilityRole="button" className="px-1 py-2">
-                <Text className="text-app-accent text-[17px] font-bold">Add</Text>
-              </Pressable>
-            </Link>
+            <View className="flex-row items-center gap-4">
+              <Link asChild href="/background-removal">
+                <Pressable accessibilityRole="button" className="px-1 py-2">
+                  <Text className="text-app-accent text-[17px] font-bold">Photo</Text>
+                </Pressable>
+              </Link>
+              <Link asChild href="/create">
+                <Pressable accessibilityRole="button" className="px-1 py-2">
+                  <Text className="text-app-accent text-[17px] font-bold">Add</Text>
+                </Pressable>
+              </Link>
+            </View>
           ),
         }}
       />

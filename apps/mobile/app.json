@@ -11,6 +11,7 @@
       "bundleIdentifier": "com.nandcello.juicecolored.dash",
       "icon": "./assets/images/icon.png",
       "infoPlist": {
+        "NSCameraUsageDescription": "Allow JuiceColored to take photos for adding food entries.",
         "NSLocationWhenInUseUsageDescription": "Allow JuiceColored to use your location to find nearby restaurants.",
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -32,6 +33,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow JuiceColored to take photos for background removal."
+        }
+      ],
       [
         "expo-splash-screen",
         {
