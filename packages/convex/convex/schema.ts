@@ -26,4 +26,9 @@ export default defineSchema({
       v.literal("recommend"),
     ),
   }),
+  food: defineTable({
+    imageUrl: v.string(),
+    restaurant: v.optional(v.id("restaurantReviews")),
+    imageProviderID: v.string(),
+  }),
 });

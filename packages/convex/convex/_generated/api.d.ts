@@ -9,6 +9,8 @@
  */
 
 import type * as crons from "../crons.js";
+import type * as food from "../food.js";
+import type * as http from "../http.js";
 import type * as listening from "../listening.js";
 import type * as places from "../places.js";
 import type * as restaurantReviews from "../restaurantReviews.js";
@@ -21,6 +23,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
+  food: typeof food;
+  http: typeof http;
   listening: typeof listening;
   places: typeof places;
   restaurantReviews: typeof restaurantReviews;
