@@ -31,12 +31,12 @@ function waitForCameraUnmount() {
 
 async function removePhotoBackground(photoUri: string) {
   try {
-    const { removeBackgroundAsync } = await import("expo-background-remover");
-    return await removeBackgroundAsync(photoUri);
+    const { removeBackground } = await import("@six33/react-native-bg-removal");
+    return await removeBackground(photoUri);
   } catch (error) {
-    if (error instanceof Error && error.message.includes("ExpoBackgroundRemover")) {
+    if (error instanceof Error && error.message.includes("react-native-bg-removal")) {
       throw new Error(
-        "The background remover native module is not available in this build. Rebuild the iOS or Android app after installing expo-background-remover.",
+        "The background remover native module is not available in this build. Rebuild the iOS or Android app after installing @six33/react-native-bg-removal.",
       );
     }
 
