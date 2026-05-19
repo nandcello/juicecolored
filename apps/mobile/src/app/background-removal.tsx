@@ -5,7 +5,9 @@ import { Image } from "expo-image";
 import { Stack } from "expo-router";
 import { getAppColors } from "@/theme/colors";
 
-type ProcessingState = "idle" | "processing";
+type ProcessingState = "idle" | "processing" | "saving";
+
+const convexSiteUrl = process.env.EXPO_PUBLIC_CONVEX_SITE;
 
 async function removePhotoBackground(photoUri: string) {
   try {
@@ -19,6 +21,28 @@ async function removePhotoBackground(photoUri: string) {
     }
 
     throw error;
+  }
+}
+
+async function createFoodRecordFromPhoto(photoUri: string) {
+  if (!convexSiteUrl) {
+    throw new Error("Convex is not configured.");
+  }
+
+  const response = await fetch(photoUri);
+  const photo = await response.blob();
+
+  const uploadResponse = await fetch(`${convexSiteUrl}/food/photo`, {
+    method: "POST",
+    headers: {
+      "content-type": photo.type || "image/png",
+    },
+    body: photo,
+  });
+
+  if (!uploadResponse.ok) {
+    const body = (await uploadResponse.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? "Could not save the food photo.");
   }
 }
 
@@ -57,6 +81,8 @@ export default function BackgroundRemovalScreen() {
       setOriginalPhotoUri(photo.uri);
 
       const nextProcessedPhotoUri = await removePhotoBackground(photo.uri);
+      setProcessingState("saving");
+      await createFoodRecordFromPhoto(nextProcessedPhotoUri);
       setProcessedPhotoUri(nextProcessedPhotoUri);
     } catch (error) {
       setErrorMessage(
@@ -121,7 +147,7 @@ export default function BackgroundRemovalScreen() {
             <View className="absolute inset-0 items-center justify-center gap-3 bg-black/45">
               <ActivityIndicator color="white" size="large" />
               <Text className="px-5 text-center text-base font-bold text-white">
-                Removing background...
+                {processingState === "saving" ? "Saving food photo..." : "Removing background..."}
               </Text>
             </View>
           ) : null}
@@ -200,8 +226,8 @@ export default function BackgroundRemovalScreen() {
         ) : null}
 
         <Text className="text-app-muted text-[15px] leading-[21px]" selectable>
-          Background removal runs through the Expo background remover native module and returns a
-          transparent PNG when a subject is found.
+          Background removal runs on device, then the saved cutout is uploaded and added to your
+          food log.
         </Text>
       </View>
     </ScrollView>

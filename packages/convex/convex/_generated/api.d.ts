@@ -14,6 +14,7 @@ import type * as http from "../http.js";
 import type * as listening from "../listening.js";
 import type * as places from "../places.js";
 import type * as restaurantReviews from "../restaurantReviews.js";
+import type * as uploadthing from "../uploadthing.js";
 
 import type {
   ApiFromModules,
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   listening: typeof listening;
   places: typeof places;
   restaurantReviews: typeof restaurantReviews;
+  uploadthing: typeof uploadthing;
 }>;
 
 /**
