@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 
-import { internalMutation } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 
 export const createPendingUpload = internalMutation({
   args: {},
@@ -74,5 +74,52 @@ export const createFromUpload = internalMutation({
       imageUrl,
       imageProviderID,
     });
+  },
+});
+
+export const get = query({
+  args: {
+    id: v.id("food"),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      _id: v.id("food"),
+      _creationTime: v.number(),
+      imageUrl: v.string(),
+      restaurant: v.optional(v.id("restaurantReviews")),
+      imageProviderID: v.string(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
+export const connectRestaurant = mutation({
+  args: {
+    foodId: v.id("food"),
+    restaurantId: v.optional(v.id("restaurantReviews")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const food = await ctx.db.get(args.foodId);
+    if (!food) {
+      throw new Error("Food record not found.");
+    }
+    if (args.restaurantId !== undefined) {
+      const restaurant = await ctx.db.get(args.restaurantId);
+      if (!restaurant) {
+        throw new Error("Restaurant review not found.");
+      }
+      await ctx.db.patch(args.foodId, {
+        restaurant: args.restaurantId,
+      });
+    } else {
+      await ctx.db.patch(args.foodId, {
+        restaurant: undefined,
+      });
+    }
+    return null;
   },
 });
