@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, useColorScheme, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, useColorScheme, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Image } from "expo-image";
 import { Stack } from "expo-router";
@@ -49,8 +49,8 @@ async function createFoodRecordFromPhoto(photoUri: string) {
 export default function BackgroundRemovalScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [originalPhotoUri, setOriginalPhotoUri] = useState<string | null>(null);
   const [processedPhotoUri, setProcessedPhotoUri] = useState<string | null>(null);
+  const [isFoodSaved, setIsFoodSaved] = useState(false);
   const [processingState, setProcessingState] = useState<ProcessingState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const colorScheme = useColorScheme();
@@ -58,6 +58,9 @@ export default function BackgroundRemovalScreen() {
   const hasCameraPermission = cameraPermission?.granted === true;
   const isBusy = processingState !== "idle";
   const hasProcessedPhoto = processedPhotoUri !== null;
+  const canTakeAnotherPhoto =
+    hasProcessedPhoto && !isBusy && (isFoodSaved || errorMessage !== null);
+  const shouldDisableCta = isBusy || (hasProcessedPhoto && !isFoodSaved && errorMessage === null);
 
   async function captureAndRemoveBackground() {
     if (!hasCameraPermission || cameraRef.current === null || isBusy) {
@@ -67,6 +70,7 @@ export default function BackgroundRemovalScreen() {
     setProcessingState("processing");
     setErrorMessage(null);
     setProcessedPhotoUri(null);
+    setIsFoodSaved(false);
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
@@ -78,12 +82,11 @@ export default function BackgroundRemovalScreen() {
         throw new Error("The camera did not return a photo.");
       }
 
-      setOriginalPhotoUri(photo.uri);
-
       const nextProcessedPhotoUri = await removePhotoBackground(photo.uri);
+      setProcessedPhotoUri(nextProcessedPhotoUri);
       setProcessingState("saving");
       await createFoodRecordFromPhoto(nextProcessedPhotoUri);
-      setProcessedPhotoUri(nextProcessedPhotoUri);
+      setIsFoodSaved(true);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not remove the photo background.",
@@ -94,20 +97,16 @@ export default function BackgroundRemovalScreen() {
   }
 
   function resetPhotos() {
-    setOriginalPhotoUri(null);
     setProcessedPhotoUri(null);
+    setIsFoodSaved(false);
     setErrorMessage(null);
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-app-background"
-      contentContainerClassName="grow gap-5 p-5 pb-10"
-      contentInsetAdjustmentBehavior="automatic"
-    >
+    <View className="flex-1 gap-5 bg-app-background p-5">
       <Stack.Screen
         options={{
-          title: "Remove Background",
+          title: "Food Camera",
           headerStyle: { backgroundColor: colors.background },
           headerLargeStyle: { backgroundColor: colors.background },
           headerTitleStyle: { color: colors.text },
@@ -119,16 +118,19 @@ export default function BackgroundRemovalScreen() {
           className="text-app-label text-[13px] font-bold uppercase tracking-[1.8px]"
           selectable
         >
-          Photo cutout
+          Food cutout
         </Text>
-        <Text className="text-app-text text-xl font-semibold leading-7" selectable>
-          Take a photo and remove its background on device.
+        <Text className="text-app-text text-3xl font-extrabold leading-9" selectable>
+          Take a photo of a food.
+        </Text>
+        <Text className="text-app-muted text-[15px] leading-[21px]" selectable>
+          We will remove the background on device and save the cutout to your food log.
         </Text>
       </View>
 
       {hasCameraPermission ? (
         <View
-          className="aspect-[3/4] overflow-hidden rounded-[28px] bg-app-field"
+          className="flex-1 overflow-hidden rounded-[32px] bg-app-field"
           style={{
             borderCurve: "continuous",
           }}
@@ -143,18 +145,10 @@ export default function BackgroundRemovalScreen() {
           ) : (
             <CameraView ref={cameraRef} facing="back" style={{ flex: 1 }} />
           )}
-          {isBusy ? (
-            <View className="absolute inset-0 items-center justify-center gap-3 bg-black/45">
-              <ActivityIndicator color="white" size="large" />
-              <Text className="px-5 text-center text-base font-bold text-white">
-                {processingState === "saving" ? "Saving food photo..." : "Removing background..."}
-              </Text>
-            </View>
-          ) : null}
         </View>
       ) : (
         <View
-          className="items-center gap-3 rounded-[24px] bg-app-field p-6"
+          className="flex-1 items-center justify-center gap-3 rounded-[32px] bg-app-field p-6"
           style={{
             borderCurve: "continuous",
           }}
@@ -179,44 +173,27 @@ export default function BackgroundRemovalScreen() {
         {hasCameraPermission ? (
           <Pressable
             accessibilityRole="button"
-            disabled={isBusy}
+            disabled={shouldDisableCta}
             onPress={hasProcessedPhoto ? resetPhotos : captureAndRemoveBackground}
-            className={`min-h-14 items-center justify-center rounded-full ${
-              isBusy ? "bg-app-disabled opacity-70" : "bg-app-text opacity-100"
+            className={`min-h-14 flex-row items-center justify-center gap-3 rounded-full ${
+              shouldDisableCta ? "bg-app-disabled opacity-70" : "bg-app-text opacity-100"
             }`}
           >
+            {isBusy ? <ActivityIndicator size="small" color={colors.label} /> : null}
             <Text
               className={`text-[17px] font-extrabold ${
-                isBusy ? "text-app-label" : "text-app-background"
+                shouldDisableCta ? "text-app-label" : "text-app-background"
               }`}
             >
-              {hasProcessedPhoto ? "Take another photo" : "Take photo"}
+              {isBusy
+                ? processingState === "saving"
+                  ? "Saving food..."
+                  : "Removing background..."
+                : canTakeAnotherPhoto
+                  ? "Take another food photo"
+                  : "Take food photo"}
             </Text>
           </Pressable>
-        ) : null}
-
-        {originalPhotoUri && hasProcessedPhoto ? (
-          <View className="gap-2">
-            <Text
-              className="text-app-label text-xs font-bold uppercase tracking-[1.3px]"
-              selectable
-            >
-              Original
-            </Text>
-            <View
-              className="aspect-square overflow-hidden rounded-[22px] bg-app-field"
-              style={{
-                borderCurve: "continuous",
-              }}
-            >
-              <Image
-                contentFit="cover"
-                source={{ uri: originalPhotoUri }}
-                style={{ flex: 1 }}
-                transition={180}
-              />
-            </View>
-          </View>
         ) : null}
 
         {errorMessage ? (
@@ -224,12 +201,7 @@ export default function BackgroundRemovalScreen() {
             {errorMessage}
           </Text>
         ) : null}
-
-        <Text className="text-app-muted text-[15px] leading-[21px]" selectable>
-          Background removal runs on device, then the saved cutout is uploaded and added to your
-          food log.
-        </Text>
       </View>
-    </ScrollView>
+    </View>
   );
 }
