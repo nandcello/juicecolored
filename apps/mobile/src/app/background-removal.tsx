@@ -1,6 +1,15 @@
 import { useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, useColorScheme, View } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  useColorScheme,
+  View,
+} from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { Stack } from "expo-router";
 import { api } from "@personal/convex";
@@ -11,6 +20,14 @@ import { getAppColors } from "@/theme/colors";
 type ProcessingState = "idle" | "processing" | "saving";
 
 const convexSiteUrl = process.env.EXPO_PUBLIC_CONVEX_SITE;
+
+function waitForCameraUnmount() {
+  return new Promise<void>((resolve) => {
+    requestIdleCallback(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
 
 async function removePhotoBackground(photoUri: string) {
   try {
@@ -55,6 +72,7 @@ async function createFoodRecordFromPhoto(photoUri: string): Promise<string> {
 export default function BackgroundRemovalScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [processedPhotoUri, setProcessedPhotoUri] = useState<string | null>(null);
   const [isFoodSaved, setIsFoodSaved] = useState(false);
   const [savedFoodId, setSavedFoodId] = useState<string | null>(null);
@@ -78,11 +96,7 @@ export default function BackgroundRemovalScreen() {
     hasProcessedPhoto && !isBusy && (isFoodSaved || errorMessage !== null);
   const shouldDisableCta = isBusy || (hasProcessedPhoto && !isFoodSaved && errorMessage === null);
 
-  async function captureAndRemoveBackground() {
-    if (!hasCameraPermission || cameraRef.current === null || isBusy) {
-      return;
-    }
-
+  async function processPhotoFromUri(photoUri: string) {
     setProcessingState("processing");
     setErrorMessage(null);
     setProcessedPhotoUri(null);
@@ -90,16 +104,7 @@ export default function BackgroundRemovalScreen() {
     setSavedFoodId(null);
 
     try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.9,
-        skipProcessing: false,
-      });
-
-      if (!photo?.uri) {
-        throw new Error("The camera did not return a photo.");
-      }
-
-      const nextProcessedPhotoUri = await removePhotoBackground(photo.uri);
+      const nextProcessedPhotoUri = await removePhotoBackground(photoUri);
       setProcessedPhotoUri(nextProcessedPhotoUri);
       setProcessingState("saving");
       const foodId = await createFoodRecordFromPhoto(nextProcessedPhotoUri);
@@ -111,6 +116,63 @@ export default function BackgroundRemovalScreen() {
       );
     } finally {
       setProcessingState("idle");
+    }
+  }
+
+  async function captureAndRemoveBackground() {
+    if (!hasCameraPermission || cameraRef.current === null || isBusy) {
+      return;
+    }
+
+    const photo = await cameraRef.current.takePictureAsync({
+      quality: 0.9,
+      skipProcessing: false,
+    });
+
+    if (!photo?.uri) {
+      setErrorMessage("The camera did not return a photo.");
+      return;
+    }
+
+    await processPhotoFromUri(photo.uri);
+  }
+
+  async function pickFromCameraRollAndRemoveBackground() {
+    if (isBusy) {
+      return;
+    }
+
+    setErrorMessage(null);
+    setIsPickerOpen(true);
+
+    try {
+      await waitForCameraUnmount();
+
+      // iOS 14+ PHPicker does not require photo library permission for images.
+      // Requesting permission without NSPhotoLibraryUsageDescription in Info.plist crashes natively.
+      if (Platform.OS === "android") {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          setErrorMessage("Photo library access is needed to choose a photo.");
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "images",
+        allowsEditing: false,
+        quality: 0.9,
+      });
+
+      if (result.canceled || !result.assets?.[0]?.uri) {
+        return;
+      }
+
+      await processPhotoFromUri(result.assets[0].uri);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not open the photo library.");
+    } finally {
+      setIsPickerOpen(false);
     }
   }
 
@@ -268,6 +330,18 @@ export default function BackgroundRemovalScreen() {
               </Pressable>
             ) : null}
 
+            {!isBusy ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={pickFromCameraRollAndRemoveBackground}
+                className="min-h-14 flex-row items-center justify-center gap-3 rounded-full border border-app-text"
+              >
+                <Text className="text-app-text text-[17px] font-extrabold">
+                  Choose another from camera roll
+                </Text>
+              </Pressable>
+            ) : null}
+
             {errorMessage ? (
               <Text className="text-[15px] leading-[21px] text-red-600" selectable>
                 {errorMessage}
@@ -298,10 +372,11 @@ export default function BackgroundRemovalScreen() {
           Food cutout
         </Text>
         <Text className="text-app-text text-3xl font-extrabold leading-9" selectable>
-          Take a photo of a food.
+          Add a photo of food.
         </Text>
         <Text className="text-app-muted text-[15px] leading-[21px]" selectable>
-          We will remove the background on device and save the cutout to your food log.
+          Take a new photo or choose one from your camera roll. We remove the background on device
+          and save the cutout to your food log.
         </Text>
       </View>
 
@@ -319,6 +394,10 @@ export default function BackgroundRemovalScreen() {
               style={{ flex: 1 }}
               transition={180}
             />
+          ) : isPickerOpen ? (
+            <View className="flex-1 items-center justify-center">
+              <ActivityIndicator size="large" color={colors.accent} />
+            </View>
           ) : (
             <CameraView ref={cameraRef} facing="back" style={{ flex: 1 }} />
           )}
@@ -334,7 +413,7 @@ export default function BackgroundRemovalScreen() {
             Camera access needed
           </Text>
           <Text className="text-center text-app-muted text-[15px] leading-[21px]" selectable>
-            Allow camera access to take a photo for background removal.
+            Allow camera access to take a photo, or choose an existing photo from your camera roll.
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -342,6 +421,18 @@ export default function BackgroundRemovalScreen() {
             onPress={requestCameraPermission}
           >
             <Text className="text-app-background text-[17px] font-extrabold">Allow camera</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={isBusy}
+            className={`min-h-12 items-center justify-center rounded-full border border-app-text px-6 ${
+              isBusy ? "opacity-70" : "opacity-100"
+            }`}
+            onPress={pickFromCameraRollAndRemoveBackground}
+          >
+            <Text className="text-app-text text-[17px] font-extrabold">
+              Choose from camera roll
+            </Text>
           </Pressable>
         </View>
       )}
@@ -369,6 +460,22 @@ export default function BackgroundRemovalScreen() {
                 : canTakeAnotherPhoto
                   ? "Take another food photo"
                   : "Take food photo"}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {!hasProcessedPhoto ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={isBusy}
+            onPress={pickFromCameraRollAndRemoveBackground}
+            className={`min-h-14 flex-row items-center justify-center gap-3 rounded-full border border-app-text ${
+              isBusy ? "opacity-70" : "opacity-100"
+            }`}
+          >
+            {isBusy ? <ActivityIndicator size="small" color={colors.text} /> : null}
+            <Text className="text-app-text text-[17px] font-extrabold">
+              Choose from camera roll
             </Text>
           </Pressable>
         ) : null}

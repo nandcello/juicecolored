@@ -12,6 +12,7 @@
       "icon": "./assets/images/icon.png",
       "infoPlist": {
         "NSCameraUsageDescription": "Allow JuiceColored to take photos for adding food entries.",
+        "NSPhotoLibraryUsageDescription": "Allow JuiceColored to choose food photos from your camera roll.",
         "NSLocationWhenInUseUsageDescription": "Allow JuiceColored to use your location to find nearby restaurants.",
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -37,6 +38,14 @@
         "expo-camera",
         {
           "cameraPermission": "Allow JuiceColored to take photos for background removal."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow JuiceColored to choose food photos from your camera roll.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       [
