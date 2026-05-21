@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -8,7 +8,7 @@ import {
   useColorScheme,
   View,
 } from "react-native";
-import { CameraView, useCameraPermissions, type FlashMode } from "expo-camera";
+import { CameraView, useCameraPermissions, type CameraType, type FlashMode } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { Stack } from "expo-router";
@@ -16,6 +16,7 @@ import { api } from "@personal/convex";
 import type { Id } from "@personal/convex/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { getAppColors } from "@/theme/colors";
+import React from "react";
 
 type ProcessingState = "idle" | "processing" | "saving";
 
@@ -38,6 +39,126 @@ const FLASH_ACCESSIBILITY_LABELS: Record<FoodCameraFlashMode, string> = {
 function nextFoodCameraFlashMode(mode: FoodCameraFlashMode): FoodCameraFlashMode {
   const index = FOOD_CAMERA_FLASH_MODES.indexOf(mode);
   return FOOD_CAMERA_FLASH_MODES[(index + 1) % FOOD_CAMERA_FLASH_MODES.length] ?? "auto";
+}
+
+type FoodCameraSelection = {
+  facing: CameraType;
+  lens?: string;
+};
+
+type FoodCameraOption = FoodCameraSelection & {
+  id: string;
+  label: string;
+};
+
+const CAMERA_FACINGS_TO_PROBE: CameraType[] = ["back"];
+
+const NON_PHOTO_REAR_LENS_PATTERN = /\b(lidar|depth|dual|triple|truedepth|true depth|duo)\b/i;
+
+function buildFoodCameraOptionId(facing: CameraType, lens?: string) {
+  return lens ? `${facing}:${lens}` : facing;
+}
+
+function isSelectableRearCameraLens(lens: string) {
+  if (lens.length === 0) {
+    return true;
+  }
+
+  return !NON_PHOTO_REAR_LENS_PATTERN.test(lens);
+}
+
+function isMainWideRearLens(lens?: string) {
+  if (!lens || lens.length === 0) {
+    return true;
+  }
+
+  return /^Back Camera$/i.test(lens.trim());
+}
+
+function getRearLensSortRank(lens?: string) {
+  if (isMainWideRearLens(lens)) {
+    return 0;
+  }
+
+  if (/\b(ultra\s*wide|ultrawide)\b/i.test(lens ?? "")) {
+    return 1;
+  }
+
+  if (/\btelephoto\b/i.test(lens ?? "")) {
+    return 2;
+  }
+
+  return 3;
+}
+
+function getFoodCameraOptionLabel(lens?: string) {
+  if (!lens) {
+    return "Wide";
+  }
+
+  const label = lens
+    .replace(/^Back\s+/i, "")
+    .replace(/\s+Camera$/i, "")
+    .replace(/^Camera$/i, "Main")
+    .trim();
+
+  return label || "Wide";
+}
+
+function buildFoodCameraOptions(
+  lensesByFacing: Partial<Record<CameraType, string[]>>,
+  unavailableFacings: ReadonlySet<CameraType>,
+) {
+  const options: FoodCameraOption[] = [];
+
+  for (const facing of CAMERA_FACINGS_TO_PROBE) {
+    if (unavailableFacings.has(facing)) {
+      continue;
+    }
+
+    const lenses = lensesByFacing[facing];
+    if (!lenses || lenses.length === 0) {
+      continue;
+    }
+
+    const selectableLenses = lenses.filter(isSelectableRearCameraLens);
+    const namedLenses = selectableLenses.filter((lens) => lens.length > 0);
+    if (namedLenses.length === 0) {
+      options.push({
+        id: facing,
+        facing,
+        label: getFoodCameraOptionLabel(),
+      });
+      continue;
+    }
+
+    for (const lens of namedLenses.sort(
+      (left, right) => getRearLensSortRank(left) - getRearLensSortRank(right),
+    )) {
+      options.push({
+        id: buildFoodCameraOptionId(facing, lens),
+        facing,
+        lens,
+        label: getFoodCameraOptionLabel(lens),
+      });
+    }
+  }
+
+  return options;
+}
+
+function nextFoodCameraOption(
+  options: FoodCameraOption[],
+  current: FoodCameraSelection,
+): FoodCameraOption | undefined {
+  if (options.length === 0) {
+    return undefined;
+  }
+
+  const currentId = buildFoodCameraOptionId(current.facing, current.lens);
+  const index = options.findIndex((option) => option.id === currentId);
+  const nextIndex = index === -1 ? 0 : (index + 1) % options.length;
+  return options[nextIndex];
 }
 
 const convexSiteUrl = process.env.EXPO_PUBLIC_CONVEX_SITE;
@@ -100,7 +221,18 @@ export default function BackgroundRemovalScreen() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [processingState, setProcessingState] = useState<ProcessingState>("idle");
   const [flashMode, setFlashMode] = useState<FoodCameraFlashMode>("auto");
+  const [cameraFacing, setCameraFacing] = useState<CameraType>("back");
+  const [selectedCameraLens, setSelectedCameraLens] = useState<string | undefined>();
+  const [cameraOptions, setCameraOptions] = useState<FoodCameraOption[]>([]);
+  const [isDiscoveringCameras, setIsDiscoveringCameras] = useState(true);
+  const [cameraDiscoveryKey, setCameraDiscoveryKey] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const cameraDiscoveryRef = useRef({
+    index: 0,
+    lensesByFacing: {} as Partial<Record<CameraType, string[]>>,
+    unavailableFacings: new Set<CameraType>(),
+    processedIndices: new Set<number>(),
+  });
 
   const reviews = useQuery(api.restaurantReviews.list);
   const foodRecord = useQuery(
@@ -117,6 +249,133 @@ export default function BackgroundRemovalScreen() {
   const canTakeAnotherPhoto =
     hasProcessedPhoto && !isBusy && (isFoodSaved || errorMessage !== null);
   const shouldDisableCta = isBusy || (hasProcessedPhoto && !isFoodSaved && errorMessage === null);
+  const selectedCameraId = buildFoodCameraOptionId(cameraFacing, selectedCameraLens);
+  const selectedCameraLabel =
+    cameraOptions.find((option) => option.id === selectedCameraId)?.label ??
+    getFoodCameraOptionLabel(selectedCameraLens);
+  const showCameraPicker = cameraOptions.length > 1 && !isDiscoveringCameras;
+
+  const finishCameraDiscovery = useCallback(
+    (
+      lensesByFacing: Partial<Record<CameraType, string[]>>,
+      unavailableFacings: Set<CameraType>,
+    ) => {
+      const options = buildFoodCameraOptions(lensesByFacing, unavailableFacings);
+      setCameraOptions(options);
+
+      const defaultOption =
+        options.find((option) => isMainWideRearLens(option.lens)) ??
+        options.find((option) => option.facing === "back") ??
+        options[0];
+      if (defaultOption) {
+        setCameraFacing(defaultOption.facing);
+        setSelectedCameraLens(defaultOption.lens);
+      }
+
+      setIsDiscoveringCameras(false);
+    },
+    [],
+  );
+
+  const skipUnavailableCameraFacing = useCallback(() => {
+    const discovery = cameraDiscoveryRef.current;
+    const probingFacing = CAMERA_FACINGS_TO_PROBE[discovery.index];
+    if (!probingFacing) {
+      return;
+    }
+
+    discovery.unavailableFacings.add(probingFacing);
+    discovery.index += 1;
+
+    if (discovery.index < CAMERA_FACINGS_TO_PROBE.length) {
+      setCameraFacing(CAMERA_FACINGS_TO_PROBE[discovery.index] ?? "back");
+      return;
+    }
+
+    finishCameraDiscovery(discovery.lensesByFacing, discovery.unavailableFacings);
+  }, [finishCameraDiscovery]);
+
+  const handleCameraReady = useCallback(async () => {
+    const discovery = cameraDiscoveryRef.current;
+    if (discovery.index >= CAMERA_FACINGS_TO_PROBE.length) {
+      return;
+    }
+
+    const probingIndex = discovery.index;
+    if (discovery.processedIndices.has(probingIndex)) {
+      return;
+    }
+
+    const probingFacing = CAMERA_FACINGS_TO_PROBE[probingIndex];
+    if (!probingFacing) {
+      return;
+    }
+
+    // Claim this probe before awaiting lenses so duplicate ready events are ignored.
+    discovery.processedIndices.add(probingIndex);
+
+    let lenses: string[] = [""];
+    if (Platform.OS === "ios") {
+      try {
+        const availableLenses = await cameraRef.current?.getAvailableLensesAsync();
+        if (availableLenses && availableLenses.length > 0) {
+          lenses = availableLenses.filter(isSelectableRearCameraLens);
+        }
+      } catch {
+        lenses = [""];
+      }
+    }
+
+    discovery.lensesByFacing[probingFacing] = lenses;
+    discovery.index += 1;
+
+    if (discovery.index < CAMERA_FACINGS_TO_PROBE.length) {
+      setCameraFacing(CAMERA_FACINGS_TO_PROBE[discovery.index] ?? "back");
+      return;
+    }
+
+    finishCameraDiscovery(discovery.lensesByFacing, discovery.unavailableFacings);
+  }, [finishCameraDiscovery]);
+
+  const handleCameraMountError = useCallback(() => {
+    if (cameraDiscoveryRef.current.index >= CAMERA_FACINGS_TO_PROBE.length) {
+      return;
+    }
+
+    skipUnavailableCameraFacing();
+  }, [skipUnavailableCameraFacing]);
+
+  const cycleCamera = useCallback(() => {
+    const nextCamera = nextFoodCameraOption(cameraOptions, {
+      facing: cameraFacing,
+      lens: selectedCameraLens,
+    });
+    if (!nextCamera) {
+      return;
+    }
+
+    setCameraFacing(nextCamera.facing);
+    setSelectedCameraLens(nextCamera.lens);
+  }, [cameraFacing, cameraOptions, selectedCameraLens]);
+
+  const handleRequestCameraPermission = useCallback(async () => {
+    const permission = await requestCameraPermission();
+    if (!permission?.granted) {
+      return;
+    }
+
+    cameraDiscoveryRef.current = {
+      index: 0,
+      lensesByFacing: {},
+      unavailableFacings: new Set<CameraType>(),
+      processedIndices: new Set<number>(),
+    };
+    setCameraOptions([]);
+    setIsDiscoveringCameras(true);
+    setCameraFacing("back");
+    setSelectedCameraLens(undefined);
+    setCameraDiscoveryKey((key) => key + 1);
+  }, [requestCameraPermission]);
 
   async function processPhotoFromUri(photoUri: string) {
     setProcessingState("processing");
@@ -421,35 +680,78 @@ export default function BackgroundRemovalScreen() {
               <ActivityIndicator size="large" color={colors.accent} />
             </View>
           ) : (
-            <>
-              <CameraView ref={cameraRef} facing="back" flash={flashMode} style={{ flex: 1 }} />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={FLASH_ACCESSIBILITY_LABELS[flashMode]}
-                accessibilityHint="Cycles flash between automatic, on, and off"
-                disabled={isBusy}
-                onPress={() => setFlashMode(nextFoodCameraFlashMode)}
-                className={`absolute top-3 right-3 min-h-11 flex-row items-center gap-1.5 rounded-full px-3.5 ${
-                  isBusy ? "opacity-50" : "opacity-100"
-                } ${flashMode === "on" ? "bg-app-accent" : "bg-app-text/88"}`}
-                style={{ borderCurve: "continuous" }}
-              >
-                <Text
-                  className={`text-[13px] font-bold uppercase tracking-[1px] ${
-                    flashMode === "on" ? "text-app-on-accent" : "text-app-background"
-                  }`}
+            <React.Fragment>
+              <CameraView
+                key={
+                  isDiscoveringCameras
+                    ? `discovery-${cameraDiscoveryKey}-${cameraFacing}`
+                    : `camera-${cameraDiscoveryKey}-${selectedCameraId}`
+                }
+                ref={cameraRef}
+                facing={cameraFacing}
+                selectedLens={selectedCameraLens}
+                flash={flashMode}
+                onCameraReady={handleCameraReady}
+                onMountError={handleCameraMountError}
+                style={{ flex: 1 }}
+              />
+              {isDiscoveringCameras ? (
+                <View className="absolute inset-0 items-center justify-center bg-app-field">
+                  <ActivityIndicator size="large" color={colors.accent} />
+                </View>
+              ) : null}
+              {showCameraPicker ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Switch camera"
+                  accessibilityHint="Cycles through available cameras on this device"
+                  disabled={isBusy}
+                  onPress={cycleCamera}
+                  className={`absolute top-3 left-3 min-h-11 max-w-[48%] flex-row items-center gap-1.5 rounded-full px-3.5 ${
+                    isBusy ? "opacity-50" : "opacity-100"
+                  } bg-app-text/88`}
+                  style={{ borderCurve: "continuous" }}
                 >
-                  Flash
-                </Text>
-                <Text
-                  className={`text-[13px] font-extrabold ${
-                    flashMode === "on" ? "text-app-on-accent" : "text-app-background"
-                  }`}
+                  <Text className="text-app-background text-[13px] font-bold uppercase tracking-[1px]">
+                    Camera
+                  </Text>
+                  <Text
+                    className="text-app-background shrink text-[13px] font-extrabold"
+                    numberOfLines={1}
+                  >
+                    {selectedCameraLabel}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {!isDiscoveringCameras ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={FLASH_ACCESSIBILITY_LABELS[flashMode]}
+                  accessibilityHint="Cycles flash between automatic, on, and off"
+                  disabled={isBusy}
+                  onPress={() => setFlashMode(nextFoodCameraFlashMode)}
+                  className={`absolute top-3 right-3 min-h-11 flex-row items-center gap-1.5 rounded-full px-3.5 ${
+                    isBusy ? "opacity-50" : "opacity-100"
+                  } ${flashMode === "on" ? "bg-app-accent" : "bg-app-text/88"}`}
+                  style={{ borderCurve: "continuous" }}
                 >
-                  {FLASH_SHORT_LABELS[flashMode]}
-                </Text>
-              </Pressable>
-            </>
+                  <Text
+                    className={`text-[13px] font-bold uppercase tracking-[1px] ${
+                      flashMode === "on" ? "text-app-on-accent" : "text-app-background"
+                    }`}
+                  >
+                    Flash
+                  </Text>
+                  <Text
+                    className={`text-[13px] font-extrabold ${
+                      flashMode === "on" ? "text-app-on-accent" : "text-app-background"
+                    }`}
+                  >
+                    {FLASH_SHORT_LABELS[flashMode]}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </React.Fragment>
           )}
         </View>
       ) : (
@@ -468,7 +770,7 @@ export default function BackgroundRemovalScreen() {
           <Pressable
             accessibilityRole="button"
             className="min-h-12 items-center justify-center rounded-full bg-app-text px-6"
-            onPress={requestCameraPermission}
+            onPress={handleRequestCameraPermission}
           >
             <Text className="text-app-background text-[17px] font-extrabold">Allow camera</Text>
           </Pressable>
