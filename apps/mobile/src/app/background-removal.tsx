@@ -8,7 +8,7 @@ import {
   useColorScheme,
   View,
 } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
+import { CameraView, useCameraPermissions, type FlashMode } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { Stack } from "expo-router";
@@ -18,6 +18,27 @@ import { useMutation, useQuery } from "convex/react";
 import { getAppColors } from "@/theme/colors";
 
 type ProcessingState = "idle" | "processing" | "saving";
+
+type FoodCameraFlashMode = Extract<FlashMode, "off" | "on" | "auto">;
+
+const FOOD_CAMERA_FLASH_MODES: FoodCameraFlashMode[] = ["auto", "on", "off"];
+
+const FLASH_SHORT_LABELS: Record<FoodCameraFlashMode, string> = {
+  auto: "Auto",
+  on: "On",
+  off: "Off",
+};
+
+const FLASH_ACCESSIBILITY_LABELS: Record<FoodCameraFlashMode, string> = {
+  auto: "Flash automatic",
+  on: "Flash on",
+  off: "Flash off",
+};
+
+function nextFoodCameraFlashMode(mode: FoodCameraFlashMode): FoodCameraFlashMode {
+  const index = FOOD_CAMERA_FLASH_MODES.indexOf(mode);
+  return FOOD_CAMERA_FLASH_MODES[(index + 1) % FOOD_CAMERA_FLASH_MODES.length] ?? "auto";
+}
 
 const convexSiteUrl = process.env.EXPO_PUBLIC_CONVEX_SITE;
 
@@ -78,6 +99,7 @@ export default function BackgroundRemovalScreen() {
   const [savedFoodId, setSavedFoodId] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [processingState, setProcessingState] = useState<ProcessingState>("idle");
+  const [flashMode, setFlashMode] = useState<FoodCameraFlashMode>("auto");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const reviews = useQuery(api.restaurantReviews.list);
@@ -382,7 +404,7 @@ export default function BackgroundRemovalScreen() {
 
       {hasCameraPermission ? (
         <View
-          className="flex-1 overflow-hidden rounded-[32px] bg-app-field"
+          className="relative flex-1 overflow-hidden rounded-[32px] bg-app-field"
           style={{
             borderCurve: "continuous",
           }}
@@ -399,7 +421,35 @@ export default function BackgroundRemovalScreen() {
               <ActivityIndicator size="large" color={colors.accent} />
             </View>
           ) : (
-            <CameraView ref={cameraRef} facing="back" style={{ flex: 1 }} />
+            <>
+              <CameraView ref={cameraRef} facing="back" flash={flashMode} style={{ flex: 1 }} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={FLASH_ACCESSIBILITY_LABELS[flashMode]}
+                accessibilityHint="Cycles flash between automatic, on, and off"
+                disabled={isBusy}
+                onPress={() => setFlashMode(nextFoodCameraFlashMode)}
+                className={`absolute top-3 right-3 min-h-11 flex-row items-center gap-1.5 rounded-full px-3.5 ${
+                  isBusy ? "opacity-50" : "opacity-100"
+                } ${flashMode === "on" ? "bg-app-accent" : "bg-app-text/88"}`}
+                style={{ borderCurve: "continuous" }}
+              >
+                <Text
+                  className={`text-[13px] font-bold uppercase tracking-[1px] ${
+                    flashMode === "on" ? "text-app-on-accent" : "text-app-background"
+                  }`}
+                >
+                  Flash
+                </Text>
+                <Text
+                  className={`text-[13px] font-extrabold ${
+                    flashMode === "on" ? "text-app-on-accent" : "text-app-background"
+                  }`}
+                >
+                  {FLASH_SHORT_LABELS[flashMode]}
+                </Text>
+              </Pressable>
+            </>
           )}
         </View>
       ) : (
