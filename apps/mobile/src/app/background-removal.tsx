@@ -15,6 +15,15 @@ import { Stack } from "expo-router";
 import { api } from "@personal/convex";
 import type { Id } from "@personal/convex/dataModel";
 import { useMutation, useQuery } from "convex/react";
+import {
+  buildFoodCameraOptionId,
+  buildFoodCameraOptions,
+  filterSelectableRearCameraLenses,
+  getFoodCameraOptionLabel,
+  isMainWideRearLens,
+  nextFoodCameraOption,
+  type FoodCameraOption,
+} from "@/food-camera-lenses";
 import { getAppColors } from "@/theme/colors";
 import React from "react";
 
@@ -41,125 +50,7 @@ function nextFoodCameraFlashMode(mode: FoodCameraFlashMode): FoodCameraFlashMode
   return FOOD_CAMERA_FLASH_MODES[(index + 1) % FOOD_CAMERA_FLASH_MODES.length] ?? "auto";
 }
 
-type FoodCameraSelection = {
-  facing: CameraType;
-  lens?: string;
-};
-
-type FoodCameraOption = FoodCameraSelection & {
-  id: string;
-  label: string;
-};
-
 const CAMERA_FACINGS_TO_PROBE: CameraType[] = ["back"];
-
-const NON_PHOTO_REAR_LENS_PATTERN = /\b(lidar|depth|dual|triple|truedepth|true depth|duo)\b/i;
-
-function buildFoodCameraOptionId(facing: CameraType, lens?: string) {
-  return lens ? `${facing}:${lens}` : facing;
-}
-
-function isSelectableRearCameraLens(lens: string) {
-  if (lens.length === 0) {
-    return true;
-  }
-
-  return !NON_PHOTO_REAR_LENS_PATTERN.test(lens);
-}
-
-function isMainWideRearLens(lens?: string) {
-  if (!lens || lens.length === 0) {
-    return true;
-  }
-
-  return /^Back Camera$/i.test(lens.trim());
-}
-
-function getRearLensSortRank(lens?: string) {
-  if (isMainWideRearLens(lens)) {
-    return 0;
-  }
-
-  if (/\b(ultra\s*wide|ultrawide)\b/i.test(lens ?? "")) {
-    return 1;
-  }
-
-  if (/\btelephoto\b/i.test(lens ?? "")) {
-    return 2;
-  }
-
-  return 3;
-}
-
-function getFoodCameraOptionLabel(lens?: string) {
-  if (!lens) {
-    return "Wide";
-  }
-
-  const label = lens
-    .replace(/^Back\s+/i, "")
-    .replace(/\s+Camera$/i, "")
-    .replace(/^Camera$/i, "Main")
-    .trim();
-
-  return label || "Wide";
-}
-
-function buildFoodCameraOptions(
-  lensesByFacing: Partial<Record<CameraType, string[]>>,
-  unavailableFacings: ReadonlySet<CameraType>,
-) {
-  const options: FoodCameraOption[] = [];
-
-  for (const facing of CAMERA_FACINGS_TO_PROBE) {
-    if (unavailableFacings.has(facing)) {
-      continue;
-    }
-
-    const lenses = lensesByFacing[facing];
-    if (!lenses || lenses.length === 0) {
-      continue;
-    }
-
-    const selectableLenses = lenses.filter(isSelectableRearCameraLens);
-    const namedLenses = selectableLenses.filter((lens) => lens.length > 0);
-    if (namedLenses.length === 0) {
-      options.push({
-        id: facing,
-        facing,
-        label: getFoodCameraOptionLabel(),
-      });
-      continue;
-    }
-
-    for (const lens of namedLenses.sort(
-      (left, right) => getRearLensSortRank(left) - getRearLensSortRank(right),
-    )) {
-      options.push({
-        id: buildFoodCameraOptionId(facing, lens),
-        facing,
-        lens,
-        label: getFoodCameraOptionLabel(lens),
-      });
-    }
-  }
-
-  return options;
-}
-
-function nextFoodCameraOption(
-  options: FoodCameraOption[],
-  current: FoodCameraSelection,
-): FoodCameraOption | undefined {
-  if (options.length === 0) {
-    return undefined;
-  }
-
-  const currentId = buildFoodCameraOptionId(current.facing, current.lens);
-  const index = options.findIndex((option) => option.id === currentId);
-  const nextIndex = index === -1 ? 0 : (index + 1) % options.length;
-  return options[nextIndex];
-}
 
 const convexSiteUrl = process.env.EXPO_PUBLIC_CONVEX_SITE;
 
@@ -260,7 +151,11 @@ export default function BackgroundRemovalScreen() {
       lensesByFacing: Partial<Record<CameraType, string[]>>,
       unavailableFacings: Set<CameraType>,
     ) => {
-      const options = buildFoodCameraOptions(lensesByFacing, unavailableFacings);
+      const options = buildFoodCameraOptions(
+        lensesByFacing,
+        unavailableFacings,
+        CAMERA_FACINGS_TO_PROBE,
+      );
       setCameraOptions(options);
 
       const defaultOption =
@@ -319,7 +214,7 @@ export default function BackgroundRemovalScreen() {
       try {
         const availableLenses = await cameraRef.current?.getAvailableLensesAsync();
         if (availableLenses && availableLenses.length > 0) {
-          lenses = availableLenses.filter(isSelectableRearCameraLens);
+          lenses = filterSelectableRearCameraLenses(availableLenses);
         }
       } catch {
         lenses = [""];
@@ -336,6 +231,25 @@ export default function BackgroundRemovalScreen() {
 
     finishCameraDiscovery(discovery.lensesByFacing, discovery.unavailableFacings);
   }, [finishCameraDiscovery]);
+
+  const handleAvailableLensesChanged = useCallback(
+    ({ lenses }: { lenses: string[] }) => {
+      const discovery = cameraDiscoveryRef.current;
+      if (discovery.index < CAMERA_FACINGS_TO_PROBE.length) {
+        return;
+      }
+
+      discovery.lensesByFacing[cameraFacing] = filterSelectableRearCameraLenses(lenses);
+      setCameraOptions(
+        buildFoodCameraOptions(
+          discovery.lensesByFacing,
+          discovery.unavailableFacings,
+          CAMERA_FACINGS_TO_PROBE,
+        ),
+      );
+    },
+    [cameraFacing],
+  );
 
   const handleCameraMountError = useCallback(() => {
     if (cameraDiscoveryRef.current.index >= CAMERA_FACINGS_TO_PROBE.length) {
@@ -692,6 +606,7 @@ export default function BackgroundRemovalScreen() {
                 selectedLens={selectedCameraLens}
                 flash={flashMode}
                 onCameraReady={handleCameraReady}
+                onAvailableLensesChanged={handleAvailableLensesChanged}
                 onMountError={handleCameraMountError}
                 style={{ flex: 1 }}
               />
