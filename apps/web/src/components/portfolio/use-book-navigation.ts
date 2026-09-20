@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createWheelGestureTracker } from "./wheel-gesture";
 
 export function useBookNavigation(pageCount: number) {
   const bookRef = useRef<HTMLElement>(null);
@@ -63,16 +64,21 @@ export function useBookNavigation(pageCount: number) {
         document.getElementById("contents-button")?.focus();
       }
     };
-    let wheelTotal = 0;
-    let lastTurn = 0;
-    let lastWheel = 0;
+    const trackGesture = createWheelGestureTracker();
+    let gestureConsumed = false;
+    let lastTurn = -Infinity;
     const wheel = (event: WheelEvent) => {
       if (
         event.ctrlKey ||
+        event.deltaY === 0 ||
         Math.abs(event.deltaX) > Math.abs(event.deltaY) ||
         document.querySelector("dialog[open]")
       )
         return;
+      const now = Date.now();
+      const direction = Math.sign(event.deltaY);
+      const { isNewGesture, isMomentum } = trackGesture(event, now);
+      if (isNewGesture) gestureConsumed = false;
       const page = book.children[currentRef.current] as HTMLElement;
       const down = event.deltaY > 0;
       const canScroll = down
@@ -82,20 +88,20 @@ export function useBookNavigation(pageCount: number) {
         canScroll ||
         (down && currentRef.current === pageCount - 1) ||
         (!down && currentRef.current === 0)
-      )
+      ) {
+        gestureConsumed = true;
         return;
-      event.preventDefault();
-      const now = Date.now();
-      if (now - lastTurn < 900) return;
-      if (now - lastWheel > 200 || Math.sign(wheelTotal) !== Math.sign(event.deltaY))
-        wheelTotal = 0;
-      lastWheel = now;
-      wheelTotal += event.deltaY;
-      if (Math.abs(wheelTotal) > 65) {
-        go(currentRef.current + (wheelTotal > 0 ? 1 : -1));
-        lastTurn = now;
-        wheelTotal = 0;
       }
+      event.preventDefault();
+      if (isMomentum) {
+        gestureConsumed = true;
+        return;
+      }
+      if (gestureConsumed) return;
+      gestureConsumed = true;
+      if (now - lastTurn < 900) return;
+      go(currentRef.current + direction);
+      lastTurn = now;
     };
     book.addEventListener("scroll", update, { passive: true });
     book.addEventListener("wheel", wheel, { passive: false });
