@@ -1,0 +1,24 @@
+# Local secrets and generated output are never deployment inputs.
+**/.env
+**/.env.*
+**/.dev.vars*
+**/node_modules
+**/.output
+**/.vercel
+**/.nitro
+**/.tanstack
+**/.wrangler
+**/dist
+**/dist-ssr
+**/.DS_Store
+.agents
+.codex
+.vite-hooks
+.vscode
+.antigravitycli
+
+# Keep the mobile workspace manifest/source for dependency installation,
+# but omit generated native projects and Expo caches from web deployments.
+apps/mobile/android
+apps/mobile/ios
+apps/mobile/.expo

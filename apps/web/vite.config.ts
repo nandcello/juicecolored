@@ -12,12 +12,14 @@ const config = defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: { ignorePatterns: ["src/routeTree.gen.ts"] },
-  lint: { options: { typeAware: true, typeCheck: true } },
   resolve: { tsconfigPaths: true },
   plugins: [
     devtools(),
-    nitro({ rollupConfig: { external: [/^@sentry\//] } }),
+    nitro({
+      rollupConfig: { external: [/^@sentry\//] },
+      // A full batch can take five 10-second evaluation deadlines.
+      vercel: { functions: { maxDuration: 60 } },
+    }),
     tailwindcss(),
     tanstackStart(),
     viteReact(),

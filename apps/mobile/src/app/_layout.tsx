@@ -4,6 +4,7 @@ import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Stack } from "expo-router";
 import { Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { OfflineDataProvider } from "@/offline/provider";
 
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
 const convexClient = convexUrl ? new ConvexReactClient(convexUrl) : null;
@@ -23,12 +24,14 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ConvexProvider client={convexClient}>
-        <Stack
-          screenOptions={{
-            headerLargeTitle: true,
-            headerShadowVisible: false,
-          }}
-        />
+        <OfflineDataProvider>
+          <Stack
+            screenOptions={{
+              headerLargeTitle: true,
+              headerShadowVisible: false,
+            }}
+          />
+        </OfflineDataProvider>
       </ConvexProvider>
     </GestureHandlerRootView>
   );

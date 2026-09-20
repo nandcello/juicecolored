@@ -15,6 +15,11 @@ export default defineSchema({
     backoffLevel: v.optional(v.number()),
   }).index("by_source", ["source"]),
   restaurantReviews: defineTable({
+    clientId: v.optional(v.string()),
+    clientRevision: v.optional(v.number()),
+    clientCreatedAt: v.optional(v.number()),
+    serverUpdatedAt: v.optional(v.number()),
+    deletedAt: v.optional(v.number()),
     restaurantName: v.string(),
     address: v.optional(v.string()),
     lat: v.optional(v.number()),
@@ -25,10 +30,32 @@ export default defineSchema({
       v.literal("will visit again"),
       v.literal("recommend"),
     ),
-  }),
+  })
+    .index("by_clientId", ["clientId"])
+    .index("by_deletedAt", ["deletedAt"]),
   food: defineTable({
+    clientId: v.optional(v.string()),
+    clientRevision: v.optional(v.number()),
+    clientCreatedAt: v.optional(v.number()),
+    serverUpdatedAt: v.optional(v.number()),
+    deletedAt: v.optional(v.number()),
     imageUrl: v.string(),
     restaurant: v.optional(v.id("restaurantReviews")),
     imageProviderID: v.string(),
-  }),
+    uploadStatus: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("processing"),
+        v.literal("complete"),
+        v.literal("failed"),
+      ),
+    ),
+    uploadStorageId: v.optional(v.id("_storage")),
+    uploadContentType: v.optional(v.string()),
+    uploadAttempt: v.optional(v.number()),
+    uploadError: v.optional(v.string()),
+  })
+    .index("by_clientId", ["clientId"])
+    .index("by_deletedAt", ["deletedAt"])
+    .index("by_uploadStatus", ["uploadStatus"]),
 });

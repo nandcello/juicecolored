@@ -27,10 +27,15 @@
   "scripts": {
     "dev": "bun --env-file=../../.env.local convex dev",
     "codegen": "bun --env-file=../../.env.local convex codegen",
-    "deploy": "bun --env-file=../../.env.local convex deploy"
+    "deploy": "bun --env-file=../../.env.local convex deploy",
+    "test": "vp test run --config vitest.config.ts"
   },
   "dependencies": {
-    "convex": "^1.37.0",
+    "convex": "^1.46.0",
     "uploadthing": "^7.7.4"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
+    "convex-test": "^0.0.59"
   }
 }

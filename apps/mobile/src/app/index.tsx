@@ -1,21 +1,19 @@
-import { api } from "@personal/convex";
-import type { Doc, Id } from "@personal/convex/dataModel";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useMutation, useQuery } from "convex/react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, useColorScheme, View } from "react-native";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { Link, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { getAppColors } from "@/theme/colors";
 import { Image } from "expo-image";
+import { useLocalFood, useLocalReviews } from "@/offline/hooks";
+import { deleteLocalReview } from "@/offline/repository";
+import { runOfflineSync } from "@/offline/sync";
+import type { LocalRestaurantReview, SyncState } from "@/offline/types";
 
-type RestaurantReviewItem = Doc<"restaurantReviews"> & {
-  createdAt: string;
-};
-
-type ReviewCardProps = RestaurantReviewItem & {
-  onDelete: (id: Id<"restaurantReviews">) => void;
+type ReviewCardProps = LocalRestaurantReview & {
+  displayCreatedAt: string;
+  onDelete: (id: string) => void;
+  statusColor: string;
 };
 
 const reviewDateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -23,15 +21,47 @@ const reviewDateFormatter = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
 });
 
-const cachedReviewItemsKey = "restaurant-review-items";
+function SyncBadge({ state, color }: { state: SyncState; color: string }) {
+  const accessibilityLabel =
+    state === "synced"
+      ? "Synced"
+      : state === "syncing"
+        ? "Syncing"
+        : state === "failed"
+          ? "Sync issue"
+          : "Waiting to sync";
+  const icon =
+    state === "synced"
+      ? "checkmark"
+      : state === "failed"
+        ? "alert-circle-outline"
+        : "cloud-upload-outline";
+  const iconColor = state === "failed" ? "#a65a5a" : color;
 
-function ReviewDeleteAction({ _id, onDelete }: Pick<ReviewCardProps, "_id" | "onDelete">) {
+  return (
+    <View
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="image"
+      className={`h-5 w-5 items-center justify-center rounded-full border border-app-disabled/40 bg-app-field/85 ${
+        state === "synced" ? "opacity-60" : state === "failed" ? "opacity-90" : "opacity-75"
+      }`}
+    >
+      {state === "syncing" ? (
+        <ActivityIndicator color={iconColor} size={10} />
+      ) : (
+        <Ionicons name={icon} color={iconColor} size={12} />
+      )}
+    </View>
+  );
+}
+
+function ReviewDeleteAction({ localId, onDelete }: Pick<ReviewCardProps, "localId" | "onDelete">) {
   return (
     <Pressable
       accessibilityLabel="Delete review"
       accessibilityRole="button"
       className="ml-3 min-w-24 items-center justify-center rounded-[22px] bg-red-500 px-5"
-      onPress={() => onDelete(_id)}
+      onPress={() => onDelete(localId)}
       style={{
         borderCurve: "continuous",
       }}
@@ -42,17 +72,19 @@ function ReviewDeleteAction({ _id, onDelete }: Pick<ReviewCardProps, "_id" | "on
 }
 
 function ReviewCard({
-  _id,
+  localId,
   restaurantName,
   address,
   review,
-  createdAt,
+  displayCreatedAt,
+  syncState,
+  statusColor,
   onDelete,
 }: ReviewCardProps) {
   return (
     <ReanimatedSwipeable
       overshootRight={false}
-      renderRightActions={() => <ReviewDeleteAction _id={_id} onDelete={onDelete} />}
+      renderRightActions={() => <ReviewDeleteAction localId={localId} onDelete={onDelete} />}
     >
       <View
         accessibilityHint="Swipe left to reveal the delete action."
@@ -61,21 +93,24 @@ function ReviewCard({
           borderCurve: "continuous",
         }}
       >
-        <View className="gap-1">
-          <Text className="text-app-text text-xl font-bold" selectable>
-            {restaurantName}
-          </Text>
-          {address ? (
-            <Text className="text-app-label text-[13px] font-semibold" selectable>
-              {address}
+        <View className="flex-row items-start gap-3">
+          <View className="flex-1 gap-1">
+            <Text className="text-app-text text-xl font-bold" selectable>
+              {restaurantName}
             </Text>
-          ) : null}
-          <Text className="text-app-muted text-[15px] capitalize" selectable>
-            {review}
-          </Text>
+            {address ? (
+              <Text className="text-app-label text-[13px] font-semibold" selectable>
+                {address}
+              </Text>
+            ) : null}
+            <Text className="text-app-muted text-[15px] capitalize" selectable>
+              {review}
+            </Text>
+          </View>
+          <SyncBadge state={syncState} color={statusColor} />
         </View>
         <Text className="text-app-label text-xs font-bold uppercase tracking-[1.3px]" selectable>
-          {createdAt}
+          {displayCreatedAt}
         </Text>
       </View>
     </ReanimatedSwipeable>
@@ -85,19 +120,28 @@ function ReviewCard({
 function FoodPhotoCard({
   imageUrl,
   restaurantName,
+  syncState,
+  statusColor,
 }: {
   imageUrl: string;
   restaurantName?: string;
+  syncState: SyncState;
+  statusColor: string;
 }) {
   return (
     <View className="w-1/2 gap-1 p-1">
-      <Image
-        source={{ uri: imageUrl }}
-        contentFit="contain"
-        recyclingKey={imageUrl}
-        style={{ width: "100%", aspectRatio: 1 }}
-        transition={200}
-      />
+      <View className="relative">
+        <Image
+          source={{ uri: imageUrl }}
+          contentFit="contain"
+          recyclingKey={imageUrl}
+          style={{ width: "100%", aspectRatio: 1 }}
+          transition={200}
+        />
+        <View className="absolute right-2 top-2">
+          <SyncBadge state={syncState} color={statusColor} />
+        </View>
+      </View>
       {restaurantName ? (
         <Text
           className="text-app-muted px-1 text-center text-[10px] font-semibold"
@@ -112,14 +156,13 @@ function FoodPhotoCard({
 
 export default function ReviewsScreen() {
   const [activeTab, setActiveTab] = useState<"reviews" | "photos">("reviews");
-  const reviews = useQuery(api.restaurantReviews.list);
-  const foodPhotos = useQuery(api.food.list);
+  const reviews = useLocalReviews();
+  const foodPhotos = useLocalFood();
 
-  const [cachedReviewItems, setCachedReviewItems] = useState<RestaurantReviewItem[]>();
-  const removeReview = useMutation(api.restaurantReviews.remove);
-
-  const handleDeleteReview = (id: Id<"restaurantReviews">) => {
-    void removeReview({ id });
+  const handleDeleteReview = (id: string) => {
+    void deleteLocalReview(id)
+      .then(() => runOfflineSync())
+      .catch(() => undefined);
   };
 
   const colorScheme = useColorScheme();
@@ -129,7 +172,7 @@ export default function ReviewsScreen() {
     () =>
       reviews?.map((review) => ({
         ...review,
-        createdAt: reviewDateFormatter.format(review._creationTime),
+        displayCreatedAt: reviewDateFormatter.format(review.createdAt),
       })),
     [reviews],
   );
@@ -138,46 +181,17 @@ export default function ReviewsScreen() {
     const map = new Map<string, string>();
     if (reviews) {
       for (const r of reviews) {
-        map.set(r._id, r.restaurantName);
+        map.set(r.localId, r.restaurantName);
       }
     }
     return map;
   }, [reviews]);
 
-  const displayedReviewItems = reviewItems ?? cachedReviewItems;
   const photoItems = useMemo(
-    () => foodPhotos?.filter((photo) => photo.imageUrl.length > 0),
+    () => foodPhotos?.filter((photo) => photo.localUri || photo.remoteUrl),
     [foodPhotos],
   );
   const isRefreshing = activeTab === "reviews" ? reviews === undefined : foodPhotos === undefined;
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function hydrateCachedReviewItems() {
-      try {
-        const storedReviewItems = await AsyncStorage.getItem(cachedReviewItemsKey);
-        if (storedReviewItems && isMounted) {
-          setCachedReviewItems(JSON.parse(storedReviewItems));
-        }
-      } catch {
-        await AsyncStorage.removeItem(cachedReviewItemsKey);
-      }
-    }
-
-    void hydrateCachedReviewItems();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (reviewItems) {
-      setCachedReviewItems(reviewItems);
-      void AsyncStorage.setItem(cachedReviewItemsKey, JSON.stringify(reviewItems));
-    }
-  }, [reviewItems]);
 
   return (
     <View className="flex-1 bg-app-background">
@@ -194,18 +208,20 @@ export default function ReviewsScreen() {
         <FlatList
           contentContainerClassName="gap-3 p-5 pb-32"
           contentInsetAdjustmentBehavior="automatic"
-          data={displayedReviewItems}
+          data={reviewItems}
           className="flex-1"
-          keyExtractor={(item) => item._id}
-          renderItem={({ item }) => <ReviewCard {...item} onDelete={handleDeleteReview} />}
+          keyExtractor={(item) => item.localId}
+          renderItem={({ item }) => (
+            <ReviewCard {...item} onDelete={handleDeleteReview} statusColor={colors.label} />
+          )}
           ListEmptyComponent={
             <View className="items-center gap-3 rounded-[24px] bg-app-field p-6">
               <Text className="text-center text-app-text text-xl font-bold" selectable>
-                {reviews === undefined ? "Loading reviews..." : "No reviews yet"}
+                {reviews === undefined ? "Loading saved reviews..." : "No reviews yet"}
               </Text>
               <Text className="text-center text-app-muted text-[15px] leading-[21px]" selectable>
                 {reviews === undefined
-                  ? "Your saved verdicts will appear here."
+                  ? "Your on-device verdicts will appear here."
                   : "Add your first restaurant verdict while it is fresh."}
               </Text>
               {reviews !== undefined ? (
@@ -231,21 +247,25 @@ export default function ReviewsScreen() {
           contentInsetAdjustmentBehavior="automatic"
           data={photoItems}
           className="flex-1"
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item) => item.localId}
           renderItem={({ item }) => (
             <FoodPhotoCard
-              imageUrl={item.imageUrl}
-              restaurantName={item.restaurant ? restaurantMap.get(item.restaurant) : undefined}
+              imageUrl={item.localUri ?? item.remoteUrl ?? ""}
+              restaurantName={
+                item.restaurantLocalId ? restaurantMap.get(item.restaurantLocalId) : undefined
+              }
+              syncState={item.syncState}
+              statusColor={colors.label}
             />
           )}
           ListEmptyComponent={
             <View className="items-center gap-3 rounded-[24px] bg-app-field p-6 m-2">
               <Text className="text-center text-app-text text-xl font-bold" selectable>
-                {foodPhotos === undefined ? "Loading food photos..." : "No food photos yet"}
+                {foodPhotos === undefined ? "Loading saved photos..." : "No food photos yet"}
               </Text>
               <Text className="text-center text-app-muted text-[15px] leading-[21px]" selectable>
                 {foodPhotos === undefined
-                  ? "Your logged dishes will appear here."
+                  ? "Your on-device food log will appear here."
                   : "Snap a photo of your culinary delights with background removal!"}
               </Text>
               {foodPhotos !== undefined ? (
@@ -274,7 +294,7 @@ export default function ReviewsScreen() {
       >
         <ActivityIndicator animating={isRefreshing} color={colors.mutedText} size="small" />
         <Text className="text-app-muted text-xs font-bold">
-          {activeTab === "reviews" ? "Refreshing latest reviews..." : "Refreshing food log..."}
+          {activeTab === "reviews" ? "Loading saved reviews..." : "Loading saved food log..."}
         </Text>
       </View>
 

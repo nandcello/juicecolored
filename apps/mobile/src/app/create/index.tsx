@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@personal/convex";
-import { useAction, useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import {
   KeyboardAvoidingView,
   Pressable,
@@ -13,13 +13,9 @@ import {
 import { Stack, useRouter } from "expo-router";
 import { useCurrentLocation } from "../../useCurrentLocation";
 import { getAppColors } from "@/theme/colors";
-
-const RATING_OPTIONS = [
-  "actively avoid",
-  "can visit again",
-  "will visit again",
-  "recommend",
-] as const;
+import { createLocalReview } from "@/offline/repository";
+import { runOfflineSync } from "@/offline/sync";
+import { RATING_OPTIONS } from "@/offline/types";
 
 const MIN_AUTOCOMPLETE_CHARACTERS = 3;
 const AUTOCOMPLETE_DEBOUNCE_MS = 350;
@@ -47,7 +43,6 @@ export default function CreateReviewScreen() {
   const [rating, setRating] = useState<(typeof RATING_OPTIONS)[number]>("will visit again");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const createRestaurantReview = useMutation(api.restaurantReviews.create);
   const searchPlaces = useAction(api.places.search);
   const { location, requestLocation } = useCurrentLocation();
   const suggestionRequestId = useRef(0);
@@ -112,15 +107,13 @@ export default function CreateReviewScreen() {
         }
 
         setSuggestions(nextSuggestions);
-      } catch (error) {
+      } catch {
         if (requestId !== suggestionRequestId.current) {
           return;
         }
 
         setSuggestions([]);
-        setSuggestionError(
-          error instanceof Error ? error.message : "Could not load restaurant suggestions.",
-        );
+        setSuggestionError("Restaurant suggestions need a connection. You can still type a place.");
       } finally {
         if (requestId === suggestionRequestId.current) {
           setIsLoadingSuggestions(false);
@@ -159,12 +152,13 @@ export default function CreateReviewScreen() {
     setSaveError(null);
 
     try {
-      await createRestaurantReview({
+      await createLocalReview({
         restaurantName: trimmedRestaurantName,
         ...(selectedRestaurantAddress ? { address: selectedRestaurantAddress } : {}),
         ...(selectedRestaurantCoordinates !== null ? selectedRestaurantCoordinates : {}),
         review: rating,
       });
+      void runOfflineSync().catch(() => undefined);
       clearAutocompleteTimeout();
       if (router.canGoBack()) {
         router.back();

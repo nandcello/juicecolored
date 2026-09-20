@@ -1,55 +1,53 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { useQuery } from "convex/react";
-import { jsonToConvex } from "convex/values";
 import { ArrowDown, ArrowUpRight, Bot, Building2, Heart, WalletCards } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api } from "@personal/convex";
 import { RecentlyEatenThumbnails } from "#/components/recently-eaten";
 import { hasConvexUrl } from "#/lib/convex-provider";
 import { formatListeningAge } from "#/lib/listening";
 
-import type { JSONValue } from "convex/values";
 import type { LucideIcon } from "lucide-react";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 
-const getPreloadedListeningStatus = createServerFn({ method: "GET" }).handler(async () => {
+const getInitialListeningStatus = createServerFn({ method: "GET" }).handler(async () => {
   const convexUrl = process.env.VITE_CONVEX_URL;
 
   if (!convexUrl) {
     return null;
   }
 
-  const { preloadQuery } = await import("convex/nextjs"); // use ConvexHttpClient if this ever stops working
+  const { ConvexHttpClient } = await import("convex/browser");
 
-  return preloadQuery(api.listening.get, {}, { url: convexUrl });
+  return new ConvexHttpClient(convexUrl).query(api.listening.get, {});
 });
 
-const getPreloadedRecentFood = createServerFn({ method: "GET" }).handler(async () => {
+const getInitialRecentFood = createServerFn({ method: "GET" }).handler(async () => {
   const convexUrl = process.env.VITE_CONVEX_URL;
 
   if (!convexUrl) {
     return null;
   }
 
-  const { preloadQuery } = await import("convex/nextjs");
+  const { ConvexHttpClient } = await import("convex/browser");
 
-  return preloadQuery(api.food.recent, {}, { url: convexUrl });
+  return new ConvexHttpClient(convexUrl).query(api.food.recent, {});
 });
 
 export const Route = createFileRoute("/")({
-  loader: async () => ({
-    preloadedListeningStatus: await getPreloadedListeningStatus(),
-    preloadedRecentFood: await getPreloadedRecentFood(),
-  }),
+  loader: async () => {
+    const [initialListeningStatus, initialRecentFood] = await Promise.all([
+      getInitialListeningStatus(),
+      getInitialRecentFood(),
+    ]);
+    return { initialListeningStatus, initialRecentFood };
+  },
   component: Home,
 });
 
 type ProjectAccent = "aiyos" | "f1realty" | "kamit" | "mithi";
-
-type ListeningStatus = (typeof api.listening.get)["_returnType"];
-type RecentFood = (typeof api.food.recent)["_returnType"];
 
 type Project = {
   name: string;
@@ -173,21 +171,14 @@ function Hero() {
 }
 
 function RecentlyEatenStatusCopy() {
-  const { preloadedRecentFood } = Route.useLoaderData();
+  const { initialRecentFood } = Route.useLoaderData();
 
   if (!hasConvexUrl) {
     return null;
   }
 
   const liveFood = useQuery(api.food.recent);
-  const preloadedFoodResult = useMemo(() => {
-    if (!preloadedRecentFood) {
-      return undefined;
-    }
-
-    return jsonToConvex(preloadedRecentFood._valueJSON as JSONValue) as RecentFood;
-  }, [preloadedRecentFood]);
-  const items = liveFood ?? preloadedFoodResult;
+  const items = liveFood === undefined ? initialRecentFood : liveFood;
 
   if (!items?.length) {
     return null;
@@ -201,21 +192,14 @@ function RecentlyEatenStatusCopy() {
 }
 
 function ListeningToStatusCopy() {
-  const { preloadedListeningStatus } = Route.useLoaderData();
+  const { initialListeningStatus } = Route.useLoaderData();
 
   if (!hasConvexUrl) {
     return null;
   }
 
   const liveStatus = useQuery(api.listening.get);
-  const preloadedStatusResult = useMemo(() => {
-    if (!preloadedListeningStatus) {
-      return undefined;
-    }
-
-    return jsonToConvex(preloadedListeningStatus._valueJSON as JSONValue) as ListeningStatus;
-  }, [preloadedListeningStatus]);
-  const status = liveStatus ?? preloadedStatusResult;
+  const status = liveStatus === undefined ? initialListeningStatus : liveStatus;
   const now = useMinuteTicker(Boolean(status && !status.isPlaying));
 
   if (!status) {

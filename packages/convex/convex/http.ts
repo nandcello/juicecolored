@@ -9,6 +9,20 @@ http.route({
   path: "/food/photo",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
+    const clientId = request.headers.get("x-client-id")?.trim();
+    const clientRevision = Number(request.headers.get("x-client-revision") ?? "1");
+    const clientCreatedAt = Number(request.headers.get("x-client-created-at") ?? Date.now());
+
+    if (!clientId || clientId.length > 128) {
+      return Response.json({ error: "A valid client ID is required." }, { status: 400 });
+    }
+    if (!Number.isSafeInteger(clientRevision) || clientRevision < 0) {
+      return Response.json({ error: "A valid client revision is required." }, { status: 400 });
+    }
+    if (!Number.isFinite(clientCreatedAt) || clientCreatedAt <= 0) {
+      return Response.json({ error: "A valid client creation time is required." }, { status: 400 });
+    }
+
     const photoBlob = await request.blob();
 
     if (photoBlob.size === 0) {
@@ -16,12 +30,24 @@ http.route({
     }
 
     const storageId = await ctx.storage.store(photoBlob);
-    const foodId = await ctx.runAction(internal.uploadthing.createFoodFromStoredPhoto, {
-      storageId,
-      contentType: photoBlob.type || request.headers.get("content-type") || "image/png",
-    });
+    let result: {
+      foodId: string;
+      status: "pending" | "processing" | "complete" | "failed";
+    };
+    try {
+      result = await ctx.runMutation(internal.food.createPendingUpload, {
+        clientId,
+        clientRevision,
+        clientCreatedAt,
+        storageId,
+        contentType: photoBlob.type || request.headers.get("content-type") || "image/png",
+      });
+    } catch (error) {
+      await ctx.storage.delete(storageId).catch(() => undefined);
+      throw error;
+    }
 
-    return Response.json({ foodId });
+    return Response.json(result, { status: result.status === "complete" ? 200 : 202 });
   }),
 });
 

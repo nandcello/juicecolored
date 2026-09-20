@@ -34,6 +34,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-background-task",
       [
         "expo-camera",
         {
@@ -57,7 +58,18 @@
             "imageWidth": 76
           }
         }
-      ]
+      ],
+      "expo-image",
+      "expo-sqlite",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ],
+      "./plugins/with-mlkit-dependencies.cjs"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -70,7 +82,7 @@
       }
     },
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "fingerprint"
     },
     "updates": {
       "url": "https://u.expo.dev/7407a13e-cc55-407e-886c-33c88fcaf102"

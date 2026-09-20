@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -12,9 +12,6 @@ import { CameraView, useCameraPermissions, type CameraType, type FlashMode } fro
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { Stack } from "expo-router";
-import { api } from "@personal/convex";
-import type { Id } from "@personal/convex/dataModel";
-import { useMutation, useQuery } from "convex/react";
 import {
   buildFoodCameraOptionId,
   buildFoodCameraOptions,
@@ -25,7 +22,9 @@ import {
   type FoodCameraOption,
 } from "@/food-camera-lenses";
 import { getAppColors } from "@/theme/colors";
-import React from "react";
+import { useLocalFood, useLocalReviews } from "@/offline/hooks";
+import { connectLocalFoodToReview, createLocalFoodFromPhoto } from "@/offline/repository";
+import { runOfflineSync } from "@/offline/sync";
 
 type ProcessingState = "idle" | "processing" | "saving";
 
@@ -52,8 +51,6 @@ function nextFoodCameraFlashMode(mode: FoodCameraFlashMode): FoodCameraFlashMode
 
 const CAMERA_FACINGS_TO_PROBE: CameraType[] = ["back"];
 
-const convexSiteUrl = process.env.EXPO_PUBLIC_CONVEX_SITE;
-
 function waitForCameraUnmount() {
   return new Promise<void>((resolve) => {
     requestIdleCallback(() => {
@@ -77,33 +74,9 @@ async function removePhotoBackground(photoUri: string) {
   }
 }
 
-async function createFoodRecordFromPhoto(photoUri: string): Promise<string> {
-  if (!convexSiteUrl) {
-    throw new Error("Convex is not configured.");
-  }
-
-  const response = await fetch(photoUri);
-  const photo = await response.blob();
-
-  const uploadResponse = await fetch(`${convexSiteUrl}/food/photo`, {
-    method: "POST",
-    headers: {
-      "content-type": photo.type || "image/png",
-    },
-    body: photo,
-  });
-
-  if (!uploadResponse.ok) {
-    const body = (await uploadResponse.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? "Could not save the food photo.");
-  }
-
-  const data = (await uploadResponse.json()) as { foodId: string };
-  return data.foodId;
-}
-
 export default function BackgroundRemovalScreen() {
   const cameraRef = useRef<CameraView>(null);
+  const photoOperationInFlightRef = useRef(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [processedPhotoUri, setProcessedPhotoUri] = useState<string | null>(null);
@@ -125,12 +98,9 @@ export default function BackgroundRemovalScreen() {
     processedIndices: new Set<number>(),
   });
 
-  const reviews = useQuery(api.restaurantReviews.list);
-  const foodRecord = useQuery(
-    api.food.get,
-    savedFoodId ? { id: savedFoodId as Id<"food"> } : "skip",
-  );
-  const connectRestaurant = useMutation(api.food.connectRestaurant);
+  const reviews = useLocalReviews();
+  const localFood = useLocalFood();
+  const foodRecord = localFood?.find((item) => item.localId === savedFoodId);
 
   const colorScheme = useColorScheme();
   const colors = getAppColors(colorScheme);
@@ -302,9 +272,10 @@ export default function BackgroundRemovalScreen() {
       const nextProcessedPhotoUri = await removePhotoBackground(photoUri);
       setProcessedPhotoUri(nextProcessedPhotoUri);
       setProcessingState("saving");
-      const foodId = await createFoodRecordFromPhoto(nextProcessedPhotoUri);
+      const foodId = await createLocalFoodFromPhoto(nextProcessedPhotoUri);
       setSavedFoodId(foodId);
       setIsFoodSaved(true);
+      void runOfflineSync().catch(() => undefined);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not remove the photo background.",
@@ -315,28 +286,43 @@ export default function BackgroundRemovalScreen() {
   }
 
   async function captureAndRemoveBackground() {
-    if (!hasCameraPermission || cameraRef.current === null || isBusy) {
+    if (
+      !hasCameraPermission ||
+      cameraRef.current === null ||
+      isBusy ||
+      photoOperationInFlightRef.current
+    ) {
       return;
     }
+    photoOperationInFlightRef.current = true;
+    setProcessingState("processing");
+    setErrorMessage(null);
 
-    const photo = await cameraRef.current.takePictureAsync({
-      quality: 0.9,
-      skipProcessing: false,
-    });
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.9,
+        skipProcessing: false,
+      });
 
-    if (!photo?.uri) {
-      setErrorMessage("The camera did not return a photo.");
-      return;
+      if (!photo?.uri) {
+        throw new Error("The camera did not return a photo.");
+      }
+
+      await processPhotoFromUri(photo.uri);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not take the food photo.");
+      setProcessingState("idle");
+    } finally {
+      photoOperationInFlightRef.current = false;
     }
-
-    await processPhotoFromUri(photo.uri);
   }
 
   async function pickFromCameraRollAndRemoveBackground() {
-    if (isBusy) {
+    if (isBusy || photoOperationInFlightRef.current) {
       return;
     }
 
+    photoOperationInFlightRef.current = true;
     setErrorMessage(null);
     setIsPickerOpen(true);
 
@@ -367,6 +353,7 @@ export default function BackgroundRemovalScreen() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not open the photo library.");
     } finally {
+      photoOperationInFlightRef.current = false;
       setIsPickerOpen(false);
     }
   }
@@ -407,8 +394,8 @@ export default function BackgroundRemovalScreen() {
             </Text>
             <Text className="text-app-muted text-[15px] leading-[21px]" selectable>
               {isFoodSaved
-                ? "The background has been removed and the cutout is stored in your food log."
-                : "We are processing the image and storing the cutout in your food log."}
+                ? "It is safe to leave this screen. Uploading continues when a connection is available."
+                : "We are storing the cutout in your on-device food log."}
             </Text>
           </View>
 
@@ -448,19 +435,20 @@ export default function BackgroundRemovalScreen() {
               ) : (
                 <View className="gap-2">
                   {reviews.map((r) => {
-                    const isSelected = foodRecord?.restaurant === r._id;
+                    const isSelected = foodRecord?.restaurantLocalId === r.localId;
                     return (
                       <Pressable
-                        key={r._id}
+                        key={r.localId}
                         onPress={async () => {
                           if (isConnecting) return;
                           setIsConnecting(true);
                           setErrorMessage(null);
                           try {
-                            await connectRestaurant({
-                              foodId: savedFoodId as Id<"food">,
-                              restaurantId: isSelected ? undefined : r._id,
-                            });
+                            await connectLocalFoodToReview(
+                              savedFoodId,
+                              isSelected ? null : r.localId,
+                            );
+                            void runOfflineSync().catch(() => undefined);
                           } catch (err) {
                             setErrorMessage(
                               err instanceof Error

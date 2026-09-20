@@ -42,13 +42,7 @@ function prefersReducedMotion() {
 }
 
 function useCanHover() {
-  const [canHover, setCanHover] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-  });
+  const [canHover, setCanHover] = useState(false);
 
   useEffect(() => {
     const media = window.matchMedia("(hover: hover) and (pointer: fine)");
@@ -91,6 +85,10 @@ export function RecentlyEatenThumbnails({ items }: { items: RecentFoodItem[] }) 
     );
   }
 
+  return <HoverableThumbnails items={items} />;
+}
+
+function HoverableThumbnails({ items }: { items: RecentFoodItem[] }) {
   const [activeItem, setActiveItem] = useState<RecentFoodItem | null>(null);
   const [previewPosition, setPreviewPosition] = useState<CursorPoint | null>(null);
   const cursorRef = useRef<CursorPoint | null>(null);
