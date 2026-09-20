@@ -1,0 +1,6 @@
+.env*
+tests
+*.tsbuildinfo
+test-results
+playwright-report
+.camera

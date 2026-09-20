@@ -7,16 +7,19 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "vp run -F @personal/web dev",
+    "dev": "vp run --parallel -F @personal/web -F @personal/jarvis dev",
     "dev:web": "vp run -F @personal/web dev",
     "dev:convex": "vp run -F @personal/convex dev",
     "dev:mobile": "vp run -F @personal/mobile start",
     "go:testflight": "vp run -F @personal/mobile go:testflight",
     "build": "vp run -F @personal/web build",
     "preview": "vp run -F @personal/web preview",
-    "check": "vp check && vp run -F @personal/mobile lint",
+    "check": "vp check && vp run -F @personal/mobile lint && vp run -F @personal/jarvis lint && vp run -F @personal/jarvis typecheck",
     "test": "vp test run",
-    "prepare": "vp config"
+    "prepare": "vp config",
+    "dev:jarvis": "vp run -F @personal/jarvis dev",
+    "dev:jarvis:convex": "vp run -F @personal/jarvis convex:dev",
+    "build:jarvis": "vp run -F @personal/jarvis build"
   },
   "devDependencies": {
     "vite": "npm:@voidzero-dev/vite-plus-core@0.3.3",

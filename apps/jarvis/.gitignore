@@ -1,0 +1,10 @@
+.vercel
+.env*
+!.env.example
+node_modules/
+.next/
+*.tsbuildinfo
+coverage/
+test-results/
+playwright-report/
+.camera/

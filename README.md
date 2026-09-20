@@ -1,3 +1,5 @@
+Jarvis home controls now live in `apps/jarvis` and are served at `/jarvis`: [development and deployment](docs/jarvis.md).
+
 Dependency versions, compatibility decisions, and validation notes: [September 2026 upgrade](docs/dependency-upgrade-2026-09.md).
 
 Spam filtering endpoints, local setup, and migration notes: [Spam filter API](docs/spam-api.md).
