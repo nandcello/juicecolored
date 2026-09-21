@@ -7,6 +7,7 @@ import { requireAdmin, authConfigured, AdminSessionError } from "@/lib/auth";
 import { convexOptions } from "@/lib/data";
 import { LoginForm, SubjectEditor, ReportEditor } from "@/components/admin-forms";
 import { logout } from "@/app/actions";
+import { SearchSummary } from "@/components/search-summary";
 export const metadata = { title: "Admin", robots: { index: false, follow: false } };
 type Params = Record<string, string | string[] | undefined>;
 const value = (p: Params, key: string) => (typeof p[key] === "string" ? (p[key] as string) : "");
@@ -202,7 +203,24 @@ async function Admin({ searchParams }: { searchParams: Promise<Params> }) {
         </Link>
         <Link href="/">View public list ↗</Link>
       </nav>
-      {view}
+      {!value(p, "edit") && !value(p, "report") ? (
+        <div className="admin-workspace">
+          <div className="admin-records">{view}</div>
+          <aside className="admin-secondary" aria-label="Site activity">
+            <Suspense
+              fallback={
+                <p className="quiet" role="status">
+                  Loading search activity…
+                </p>
+              }
+            >
+              <SearchSummary token={token} />
+            </Suspense>
+          </aside>
+        </div>
+      ) : (
+        view
+      )}
     </>
   );
 }

@@ -15,6 +15,7 @@ import type * as canceldt_loginLimit from "../canceldt/loginLimit.js";
 import type * as canceldt_model from "../canceldt/model.js";
 import type * as canceldt_public from "../canceldt/public.js";
 import type * as canceldt_reports from "../canceldt/reports.js";
+import type * as canceldt_searches from "../canceldt/searches.js";
 import type * as crons from "../crons.js";
 import type * as food from "../food.js";
 import type * as http from "../http.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   "canceldt/model": typeof canceldt_model;
   "canceldt/public": typeof canceldt_public;
   "canceldt/reports": typeof canceldt_reports;
+  "canceldt/searches": typeof canceldt_searches;
   crons: typeof crons;
   food: typeof food;
   http: typeof http;

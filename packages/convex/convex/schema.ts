@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { subjectFields, reportFields } from "./canceldt/model";
 
 export default defineSchema({
+  canceldtSearches: defineTable({ query: v.string() }),
   canceldtSubjects: defineTable(subjectFields)
     .index("by_publicationState_and_publishedAt", ["publicationState", "publishedAt"])
     .index("by_normalizedSubject", ["normalizedSubject"])

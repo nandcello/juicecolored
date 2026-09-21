@@ -1,4 +1,6 @@
 import { latest, detail, search } from "@/lib/data";
+import { after } from "next/server";
+import { recordSearch } from "@/lib/search-tracking";
 import { socialImage } from "@/lib/metadata";
 import { cleanSubject } from "@personal/convex/canceldt-model";
 const escape = (text: string) =>
@@ -15,6 +17,7 @@ export async function GET(request: Request) {
     raw = url.searchParams.get("q") ?? "",
     q = cleanSubject(raw);
   const slug = url.searchParams.get("slug");
+  if (!slug && q && raw.length <= 160) after(() => recordSearch(q));
   let body = "",
     status = 200;
   try {

@@ -14,6 +14,16 @@ export function SearchForm({ query }: { query: string }) {
         event.preventDefault();
         const value = new FormData(event.currentTarget).get("q");
         const q = typeof value === "string" ? value : "";
+        if (q.trim() && q.length <= 160) {
+          // Record explicit submissions only; renders, prefetches and history navigation
+          // must not inflate the counts. Keep search navigation independent of analytics.
+          void fetch("/canceldt/api/searches", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ q }),
+            keepalive: true,
+          }).catch(() => {});
+        }
         startTransition(() => router.push(q.trim() ? `/?q=${encodeURIComponent(q)}` : "/"));
       }}
     >

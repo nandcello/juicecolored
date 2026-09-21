@@ -10,6 +10,8 @@ CANCELDT is an isolated Next.js App Router workspace in `apps/canceldt`, mounted
 - `/canceldt/api/og?slug=…` or `?q=…`: dynamic 1200×630 PNG preview, resolved from public data.
 - `/canceldt/report?subject=…`: private report/correction form.
 - `/canceldt/admin`: owner sign-in, Subjects and Reports.
+- `/canceldt/admin/searches`: administrator-only search history, newest first, with cursor pagination (25 per page).
+- `/canceldt/api/searches`: POST endpoint for anonymous search-submission analytics.
 - `/calceldt/admin`: 308 redirect to the canonical administrator route.
 - `/canceldt/api/revalidate`: authenticated POST for external maintenance invalidation.
 
@@ -20,6 +22,8 @@ Share controls on search results, list entries, and record pages call the device
 Search and record pages provide server-rendered Open Graph/Twitter metadata with the subject, current verdict, and published headline. `CANCELDT_PUBLIC_ORIGIN` supplies canonical and preview-image origins. Images match the default OG artwork: cream paper, oversized uppercase Barlow display type, Geist supporting text, red punctuation, fine dividers, and the footer call to action. Fonts are bundled locally. Long subjects and headlines clamp to two lines. Images bypass CDN caching and follow the public data cache's existing revalidation window. Draft, archived, and missing records cannot generate record previews. Social platforms may retain their own previews after fetching them.
 
 ## Versions and implementation
+
+The admin dashboard keeps record management in the main column and shows a compact search-activity sidebar (below the records on smaller screens). It summarizes the latest 500 recorded searches, including distinct terms and the three most frequent terms, with a link to the full history. Case, Unicode and whitespace variants are grouped. The dedicated history preserves each submission and its timestamp; only the query and timestamp are stored, without visitor identifiers. Tracking starts when this feature is deployed; earlier searches cannot be recovered. Enhanced search records explicit submissions in a separate request, so refreshes, history navigation, metadata generation and prefetches do not add events. The no-JavaScript `/lookup?q=…` fallback records each valid nonempty lookup request, including refreshes. Blank and oversized terms are excluded. Tracking failures are logged server-side without the term and never block search results.
 
 Registry checked during implementation: Next stable **16.3.5**, React stable **19.3.0**. CANCELDT pins these; existing applications retain their existing manifest versions. React Compiler **1.0.0** is installed, `reactCompiler: true` and `cacheComponents: true` remain enabled. Node 22 is the deployment runtime. Existing Nitro prerelease is preserved. Barlow Condensed 800 Latin is bundled locally; body text uses the system Arial/Helvetica stack. No runtime font service is required.
 
