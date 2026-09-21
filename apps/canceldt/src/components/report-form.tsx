@@ -27,7 +27,12 @@ export function ReportForm({
   );
   if (state.success)
     return (
-      <div role="status" className="empty">
+      <div
+        role="status"
+        className="empty report-confirmation"
+        tabIndex={-1}
+        ref={(element) => element?.focus()}
+      >
         <h2>Received. Under review.</h2>
         <p>Your report is private. Nothing has been published or changed.</p>
         <Link href="/">Back to the list →</Link>

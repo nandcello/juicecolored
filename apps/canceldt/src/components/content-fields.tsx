@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { SourceFields } from "./source-fields";
 import { LIMITS } from "@personal/convex/canceldt-model";
 import type { Content } from "@personal/convex/canceldt-model";
 export function ContentFields({
@@ -11,10 +12,6 @@ export function ContentFields({
 }) {
   const [subject, setSubject] = useState(initial?.subject ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [sources, setSources] = useState(() =>
-    (initial?.sources ?? []).map((s, i) => ({ ...s, key: i })),
-  );
-  const [nextKey, setNextKey] = useState(sources.length);
   const [reason, setReason] = useState(initial?.oneLineReason ?? "");
   return (
     <>
@@ -71,67 +68,7 @@ export function ContentFields({
         aria-invalid={!!errors.description}
       />
       {errors.description ? <p className="field-error">{errors.description}</p> : null}
-      <fieldset className="source-fields">
-        <legend>
-          Sources <span>Optional · up to 12 web links</span>
-        </legend>
-        {sources.map((s, index) => (
-          <div className="source-row" key={s.key}>
-            <label htmlFor={`url-${s.key}`}>Source {index + 1} address</label>
-            <input
-              id={`url-${s.key}`}
-              name="sourceUrl"
-              type="url"
-              maxLength={LIMITS.url}
-              placeholder="https://"
-              value={s.url}
-              onChange={(event) =>
-                setSources((rows) =>
-                  rows.map((row) =>
-                    row.key === s.key ? { ...row, url: event.target.value } : row,
-                  ),
-                )
-              }
-              aria-invalid={!!errors.sources}
-            />
-            <label htmlFor={`title-${s.key}`}>
-              Source {index + 1} title <span>Optional</span>
-            </label>
-            <input
-              id={`title-${s.key}`}
-              name="sourceTitle"
-              maxLength={LIMITS.title}
-              value={s.title}
-              onChange={(event) =>
-                setSources((rows) =>
-                  rows.map((row) =>
-                    row.key === s.key ? { ...row, title: event.target.value } : row,
-                  ),
-                )
-              }
-            />
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => setSources((rows) => rows.filter((row) => row.key !== s.key))}
-            >
-              Remove source {index + 1} ×
-            </button>
-          </div>
-        ))}
-        {errors.sources ? <p className="field-error">{errors.sources}</p> : null}
-        <button
-          type="button"
-          className="secondary"
-          disabled={sources.length >= LIMITS.sources}
-          onClick={() => {
-            setSources((rows) => [...rows, { key: nextKey, url: "", title: "" }]);
-            setNextKey((k) => k + 1);
-          }}
-        >
-          + Add source
-        </button>
-      </fieldset>
+      <SourceFields initial={initial?.sources} error={errors.sources} />
     </>
   );
 }

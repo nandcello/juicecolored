@@ -70,15 +70,17 @@ export function SubjectEditor({ subject }: { subject?: Doc<"canceldtSubjects"> }
           Sign in in a separate tab →
         </Link>
       ) : null}
-      {state.success ? (
-        <div>
-          <p role="status">
-            Saved. <Link href={`/admin?edit=${state.id}`}>Open saved entry →</Link>
-          </p>
-          {/* Reload even on edit=new so the saved record ID and all form state are cleared. */}
-          <a href="/canceldt/admin?edit=new">Create another subject →</a>
-        </div>
-      ) : null}
+      <div className="save-status" role="status" aria-atomic="true">
+        {state.success && !pending ? (
+          <div className="save-confirmation">
+            <p>
+              Saved. <Link href={`/admin?edit=${state.id}`}>Open saved entry →</Link>
+            </p>
+            {/* Reload even on edit=new so the saved record ID and all form state are cleared. */}
+            <a href="/canceldt/admin?edit=new">Create another subject →</a>
+          </div>
+        ) : null}
+      </div>
       <div className="actions">
         <button type="submit" name="intent" value="draft" disabled={pending} className="secondary">
           Save draft

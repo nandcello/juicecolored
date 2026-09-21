@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { socialImage } from "@/lib/metadata";
+import { MotionShell } from "@/components/motion-shell";
 import "@fontsource/barlow-condensed/latin-800.css";
 import "./globals.css";
 export const metadata: Metadata = {
@@ -16,7 +17,7 @@ export default function Layout({ children }: Readonly<{ children: React.ReactNod
         <a className="skip" href="#main">
           Skip to content
         </a>
-        <div className="shell">
+        <MotionShell>
           <header>
             <Link href="/" className="wordmark" aria-label="CANCELDT home">
               CANCELDT<span>.</span>
@@ -41,7 +42,7 @@ export default function Layout({ children }: Readonly<{ children: React.ReactNod
               </Link>
             </div>
           </footer>
-        </div>
+        </MotionShell>
       </body>
     </html>
   );

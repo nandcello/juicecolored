@@ -6,6 +6,12 @@
   --line: #d5d3cc;
   --red: #c82c27;
   --display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --motion-press: 100ms;
+  --motion-row: 160ms;
+  --motion-exit: 120ms;
+  --motion-confirm: 180ms;
+  --motion-reduced: 80ms;
 }
 * {
   box-sizing: border-box;
@@ -48,6 +54,14 @@ button {
 button:disabled {
   opacity: 0.5;
   cursor: wait;
+}
+.shell[data-input="pointer"] button:not(.text-button) {
+  transition:
+    transform var(--motion-press) var(--ease-out),
+    opacity var(--motion-press) var(--ease-out);
+}
+.shell[data-input="pointer"] button:enabled:not(.text-button):active {
+  transform: scale(0.98);
 }
 a:focus-visible,
 button:focus-visible,
@@ -317,8 +331,65 @@ header {
 .source-row {
   display: grid;
   gap: 8px;
+  min-width: 0;
+  margin: 0;
+  border: 0;
   border-top: 1px solid var(--line);
   padding: 16px 0;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--motion-row) var(--ease-out),
+    transform var(--motion-row) var(--ease-out);
+}
+.source-row[data-exiting] {
+  opacity: 0;
+  transform: translateY(6px);
+  transition-duration: var(--motion-exit);
+}
+.source-fields {
+  overflow-anchor: none;
+}
+.report-confirmation {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--motion-confirm) var(--ease-out),
+    transform var(--motion-confirm) var(--ease-out);
+}
+.save-status {
+  min-height: 5.5em;
+}
+.save-confirmation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  opacity: 1;
+  transition: opacity var(--motion-exit) var(--ease-out);
+}
+.save-confirmation p {
+  margin: 0;
+}
+@starting-style {
+  .source-row[data-entering],
+  .report-confirmation {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  .save-confirmation {
+    opacity: 0;
+  }
+}
+/* Keyboard actions and focus changes never wait for motion. */
+.shell[data-input="keyboard"] :is(.source-row, .report-confirmation, .save-confirmation) {
+  transition: none;
+  transform: none;
+  opacity: 1;
+}
+.shell[data-input="keyboard"] [data-source-layout] {
+  transition: none !important;
+  transform: none !important;
 }
 .source-row label {
   font-size: 13px;
@@ -561,5 +632,25 @@ footer a {
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;
+  }
+  .source-row,
+  .source-row[data-exiting],
+  .report-confirmation,
+  .save-confirmation {
+    transform: none !important;
+    transition-property: opacity;
+    transition-duration: var(--motion-reduced);
+  }
+  [data-source-layout] {
+    transform: none !important;
+    transition: none !important;
+  }
+  .shell[data-input="pointer"] button:not(.text-button) {
+    transform: none;
+    transition: opacity var(--motion-reduced) var(--ease-out);
+  }
+  .shell[data-input="pointer"] button:enabled:not(.text-button):active {
+    transform: none;
+    opacity: 0.8;
   }
 }
