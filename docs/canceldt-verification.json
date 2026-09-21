@@ -1,0 +1,121 @@
+{
+  "verifiedAt": "2026-09-21T03:39:36.007Z",
+  "origin": "https://juicecolored.localhost/canceldt",
+  "build": "Next.js production build; Cache Components and React Compiler enabled",
+  "suites": [
+    {
+      "suite": "agent-browser",
+      "date": "2026-09-21T03:30:13.229Z",
+      "session": "canceldt-audit",
+      "name": "Fictional Browser QA 1789961387921 Café",
+      "checks": [
+        "Unauthenticated admin excludes editors",
+        "Wrong passphrase rejected",
+        "Real owner sign-in uses canonical path",
+        "Native required validation prevents empty create",
+        "Server validation preserves entered values",
+        "Exactly one subject field after save",
+        "New draft created at revision 1",
+        "Failed edit retains saved ID and revision",
+        "Unsafe source scheme rejected without losing input",
+        "Exactly one subject field after save",
+        "Publish keeps the selected publication state",
+        "Publish updates the original record",
+        "Exactly one subject field after save",
+        "Second consecutive edit updates the same record",
+        "Case and whitespace normalized exact search reflects edit",
+        "Detail renders persisted source",
+        "Archive requires confirmation and preserves form",
+        "Exactly one subject field after save",
+        "Archived detail excluded immediately",
+        "Exactly one subject field after save",
+        "Restored detail visible immediately",
+        "Duplicate create rejected without sign-out",
+        "Same passphrase works after create, edit, archive, restore and logout",
+        "Exactly one subject field after save",
+        "Browser-created fixture archived"
+      ]
+    },
+    {
+      "suite": "report-browser",
+      "name": "FictionalReportQa1789961392304",
+      "checks": [
+        "Report subject prefilled",
+        "Failed spam check keeps report content",
+        "Report success confirms private review",
+        "Pending report is not public",
+        "Repeated submission creates only one pending report",
+        "Approval publishes edited report content immediately",
+        "Correction explicitly targets existing subject",
+        "Correction changes existing published entry",
+        "Rejection does not publish",
+        "Report-created fixture archived"
+      ]
+    },
+    {
+      "suite": "failure-browser",
+      "name": "Fictional Failure QA 1789961540830",
+      "checks": [
+        "Backend outage shows service error instead of login",
+        "Retry restores admin with the same session",
+        "Failed create retains input",
+        "Retry after failed create saves one draft",
+        "Expired session preserves record identity and unsaved edit",
+        "Expired session offers separate-tab sign-in",
+        "Restored session retries original edit successfully",
+        "Concurrent edit conflict rejects overwrite and retains input",
+        "Reload displays the actual winning revision",
+        "Failed public lookup never shows a not-cancelled verdict",
+        "Public Retry re-runs the failed lookup"
+      ]
+    },
+    {
+      "suite": "public-browser",
+      "prefix": "FictionalPublicQa1789961686884",
+      "checks": [
+        "Latest list contains exactly five",
+        "Latest ordering uses publication date",
+        "Unicode-equivalent exact match preserves canonical spelling",
+        "Direct search survives refresh",
+        "Partial search covers more than latest five",
+        "Browser Back and Forward restore searches",
+        "Clear returns to latest URL",
+        "Whitespace-only query shows latest",
+        "Special input escaped and first repeated q wins",
+        "No-match report link carries the search subject",
+        "Source editor supports twelve fields",
+        "Thirteenth source disabled",
+        "Remove source keeps remaining fields",
+        "Overlong query rejected without verdict",
+        "Reason text cannot identify a subject",
+        "Café: correct detail affordance",
+        "Café: detail content present",
+        "Sources: correct detail affordance",
+        "Sources: detail content present",
+        "Reason: correct detail affordance",
+        "Draft detail excluded",
+        "Missing detail returns intentional not-found view",
+        "Long subject fits 320px mobile viewport",
+        "Report sources fit mobile viewport",
+        "Native GET fallback returns complete script-free results"
+      ]
+    },
+    {
+      "suite": "auth-errors-browser",
+      "checks": [
+        "Sign-in network failure does not claim the password is wrong",
+        "Sign-in rate limit gives the real retry interval"
+      ]
+    },
+    {
+      "suite": "extra-browser",
+      "checks": [
+        "Pending search hides the previous verdict",
+        "Admin pagination advances to different records"
+      ]
+    }
+  ],
+  "unitTests": 109,
+  "playwrightTests": 9,
+  "turnstile": "Official test keys used only during automated report flow. Real local widget credentials and hostname/action checks restored; dummy tokens rejected afterward."
+}

@@ -1,0 +1,22 @@
+{
+  "measuredAt": "2026-09-20T18:10:52.833Z",
+  "environment": "Next 16.3.5 optimized webpack production build, Node 22, local macOS host, Chromium desktop 1440x1000, no CPU/network throttling, live remote development Convex; direct loopback (not Vite), cold browser then warm browser/process",
+  "cold": {
+    "ttfbMs": 14.700000017881393,
+    "fcpMs": 92,
+    "lcpMs": 92,
+    "jsEncodedBytes": 138673,
+    "jsDecodedBytes": 460570,
+    "scriptCount": 8,
+    "resultsReadyMs": 382.86241699999994
+  },
+  "warmLoadsMs": [
+    42.10575000000017, 334.79420800000025, 330.3366670000005, 30.341707999999926, 332.05595900000026
+  ],
+  "committedSearchMs": [
+    343.38370799999984, 319.3655840000001, 312.83354099999997, 325.7437919999993, 312.8664579999995
+  ],
+  "detailNavigationMs": [
+    818.4983339999999, 55.86070900000004, 56.29945899999984, 56.51649999999972, 54.911417000000256
+  ]
+}

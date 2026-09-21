@@ -22,7 +22,8 @@
     },
     "./dataModel": {
       "types": "./convex/_generated/dataModel.d.ts"
-    }
+    },
+    "./canceldt-model": "./convex/canceldt/model.ts"
   },
   "scripts": {
     "dev": "bun --env-file=../../.env.local convex dev",

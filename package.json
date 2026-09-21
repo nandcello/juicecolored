@@ -7,7 +7,7 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "vp run --parallel -F @personal/web -F @personal/jarvis dev",
+    "dev": "vp run --parallel -F @personal/web -F @personal/jarvis -F @personal/canceldt dev",
     "dev:web": "vp run -F @personal/web dev",
     "dev:convex": "vp run -F @personal/convex dev",
     "dev:mobile": "vp run -F @personal/mobile start",
@@ -19,7 +19,9 @@
     "prepare": "vp config",
     "dev:jarvis": "vp run -F @personal/jarvis dev",
     "dev:jarvis:convex": "vp run -F @personal/jarvis convex:dev",
-    "build:jarvis": "vp run -F @personal/jarvis build"
+    "build:jarvis": "vp run -F @personal/jarvis build",
+    "dev:canceldt": "vp run -F @personal/canceldt dev",
+    "build:canceldt": "vp run -F @personal/canceldt build"
   },
   "devDependencies": {
     "vite": "npm:@voidzero-dev/vite-plus-core@0.3.3",

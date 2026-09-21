@@ -1,0 +1,21 @@
+{
+  "date": "2026-09-21T05:13:14.291Z",
+  "checks": [
+    "Production public list renders",
+    "Dedicated CANCELDT sign-in copy",
+    "Home-controls passphrase rejected",
+    "Independent production passphrase signs in on canonical domain",
+    "Published default in production",
+    "Production draft saved without sign-out",
+    "Consecutive edit persists on same record",
+    "Create another clears identity and form in production",
+    "Distinct second record",
+    "Draft excluded from public search",
+    "Private verification drafts archived",
+    "Same new passphrase works after save/edit/logout",
+    "Production report form loads",
+    "Main landing page still renders",
+    "Home-controls sign-in still renders"
+  ],
+  "privateFixtureIds": ["js7ba9wtpxek8wgqt1kypmxkcn8evxez", "js70sts9x69stwsn1dpwz2wcwd8etgwt"]
+}
