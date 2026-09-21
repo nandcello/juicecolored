@@ -1,0 +1,400 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-20T10:08:30.835531+00:00",
+  "title": "Design System: Jarvis",
+  "extensions": {
+    "colorMeta": {
+      "forest": {
+        "role": "primary",
+        "displayName": "Forest",
+        "tonalRamp": [
+          "oklch(15% 0.0616 160.62)",
+          "oklch(26% 0.0616 160.62)",
+          "oklch(38% 0.0616 160.62)",
+          "oklch(49% 0.0616 160.62)",
+          "oklch(61% 0.0616 160.62)",
+          "oklch(72% 0.0616 160.62)",
+          "oklch(84% 0.0616 160.62)",
+          "oklch(95% 0.0616 160.62)"
+        ]
+      },
+      "forest-hover": {
+        "role": "primary",
+        "displayName": "Forest Hover",
+        "tonalRamp": [
+          "oklch(15% 0.0550 160.40)",
+          "oklch(26% 0.0550 160.40)",
+          "oklch(38% 0.0550 160.40)",
+          "oklch(49% 0.0550 160.40)",
+          "oklch(61% 0.0550 160.40)",
+          "oklch(72% 0.0550 160.40)",
+          "oklch(84% 0.0550 160.40)",
+          "oklch(95% 0.0550 160.40)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas",
+        "tonalRamp": [
+          "oklch(15% 0.0028 128.49)",
+          "oklch(26% 0.0028 128.49)",
+          "oklch(38% 0.0028 128.49)",
+          "oklch(49% 0.0028 128.49)",
+          "oklch(61% 0.0028 128.49)",
+          "oklch(72% 0.0028 128.49)",
+          "oklch(84% 0.0028 128.49)",
+          "oklch(95% 0.0028 128.49)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0000 89.88)",
+          "oklch(26% 0.0000 89.88)",
+          "oklch(38% 0.0000 89.88)",
+          "oklch(49% 0.0000 89.88)",
+          "oklch(61% 0.0000 89.88)",
+          "oklch(72% 0.0000 89.88)",
+          "oklch(84% 0.0000 89.88)",
+          "oklch(95% 0.0000 89.88)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0131 140.46)",
+          "oklch(26% 0.0131 140.46)",
+          "oklch(38% 0.0131 140.46)",
+          "oklch(49% 0.0131 140.46)",
+          "oklch(61% 0.0131 140.46)",
+          "oklch(72% 0.0131 140.46)",
+          "oklch(84% 0.0131 140.46)",
+          "oklch(95% 0.0131 140.46)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0119 145.40)",
+          "oklch(26% 0.0119 145.40)",
+          "oklch(38% 0.0119 145.40)",
+          "oklch(49% 0.0119 145.40)",
+          "oklch(61% 0.0119 145.40)",
+          "oklch(72% 0.0119 145.40)",
+          "oklch(84% 0.0119 145.40)",
+          "oklch(95% 0.0119 145.40)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "tonalRamp": [
+          "oklch(15% 0.0080 139.44)",
+          "oklch(26% 0.0080 139.44)",
+          "oklch(38% 0.0080 139.44)",
+          "oklch(49% 0.0080 139.44)",
+          "oklch(61% 0.0080 139.44)",
+          "oklch(72% 0.0080 139.44)",
+          "oklch(84% 0.0080 139.44)",
+          "oklch(95% 0.0080 139.44)"
+        ]
+      },
+      "field-border": {
+        "role": "neutral",
+        "displayName": "Field Border",
+        "tonalRamp": [
+          "oklch(15% 0.0181 140.02)",
+          "oklch(26% 0.0181 140.02)",
+          "oklch(38% 0.0181 140.02)",
+          "oklch(49% 0.0181 140.02)",
+          "oklch(61% 0.0181 140.02)",
+          "oklch(72% 0.0181 140.02)",
+          "oklch(84% 0.0181 140.02)",
+          "oklch(95% 0.0181 140.02)"
+        ]
+      },
+      "button-border": {
+        "role": "neutral",
+        "displayName": "Button Border",
+        "tonalRamp": [
+          "oklch(15% 0.0133 141.80)",
+          "oklch(26% 0.0133 141.80)",
+          "oklch(38% 0.0133 141.80)",
+          "oklch(49% 0.0133 141.80)",
+          "oklch(61% 0.0133 141.80)",
+          "oklch(72% 0.0133 141.80)",
+          "oklch(84% 0.0133 141.80)",
+          "oklch(95% 0.0133 141.80)"
+        ]
+      },
+      "neutral-hover": {
+        "role": "neutral",
+        "displayName": "Neutral Hover",
+        "tonalRamp": [
+          "oklch(15% 0.0079 139.44)",
+          "oklch(26% 0.0079 139.44)",
+          "oklch(38% 0.0079 139.44)",
+          "oklch(49% 0.0079 139.44)",
+          "oklch(61% 0.0079 139.44)",
+          "oklch(72% 0.0079 139.44)",
+          "oklch(84% 0.0079 139.44)",
+          "oklch(95% 0.0079 139.44)"
+        ]
+      },
+      "selected-surface": {
+        "role": "neutral",
+        "displayName": "Selected Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0117 153.66)",
+          "oklch(26% 0.0117 153.66)",
+          "oklch(38% 0.0117 153.66)",
+          "oklch(49% 0.0117 153.66)",
+          "oklch(61% 0.0117 153.66)",
+          "oklch(72% 0.0117 153.66)",
+          "oklch(84% 0.0117 153.66)",
+          "oklch(95% 0.0117 153.66)"
+        ]
+      },
+      "selected-ink": {
+        "role": "neutral",
+        "displayName": "Selected Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0616 159.25)",
+          "oklch(26% 0.0616 159.25)",
+          "oklch(38% 0.0616 159.25)",
+          "oklch(49% 0.0616 159.25)",
+          "oklch(61% 0.0616 159.25)",
+          "oklch(72% 0.0616 159.25)",
+          "oklch(84% 0.0616 159.25)",
+          "oklch(95% 0.0616 159.25)"
+        ]
+      },
+      "notice-surface": {
+        "role": "neutral",
+        "displayName": "Notice Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0123 137.78)",
+          "oklch(26% 0.0123 137.78)",
+          "oklch(38% 0.0123 137.78)",
+          "oklch(49% 0.0123 137.78)",
+          "oklch(61% 0.0123 137.78)",
+          "oklch(72% 0.0123 137.78)",
+          "oklch(84% 0.0123 137.78)",
+          "oklch(95% 0.0123 137.78)"
+        ]
+      },
+      "warning-surface": {
+        "role": "neutral",
+        "displayName": "Warning Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0164 79.35)",
+          "oklch(26% 0.0164 79.35)",
+          "oklch(38% 0.0164 79.35)",
+          "oklch(49% 0.0164 79.35)",
+          "oklch(61% 0.0164 79.35)",
+          "oklch(72% 0.0164 79.35)",
+          "oklch(84% 0.0164 79.35)",
+          "oklch(95% 0.0164 79.35)"
+        ]
+      },
+      "warning-border": {
+        "role": "neutral",
+        "displayName": "Warning Border",
+        "tonalRamp": [
+          "oklch(15% 0.0546 79.97)",
+          "oklch(26% 0.0546 79.97)",
+          "oklch(38% 0.0546 79.97)",
+          "oklch(49% 0.0546 79.97)",
+          "oklch(61% 0.0546 79.97)",
+          "oklch(72% 0.0546 79.97)",
+          "oklch(84% 0.0546 79.97)",
+          "oklch(95% 0.0546 79.97)"
+        ]
+      },
+      "warning-ink": {
+        "role": "neutral",
+        "displayName": "Warning Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0769 72.43)",
+          "oklch(26% 0.0769 72.43)",
+          "oklch(38% 0.0769 72.43)",
+          "oklch(49% 0.0769 72.43)",
+          "oklch(61% 0.0769 72.43)",
+          "oklch(72% 0.0769 72.43)",
+          "oklch(84% 0.0769 72.43)",
+          "oklch(95% 0.0769 72.43)"
+        ]
+      },
+      "error": {
+        "role": "neutral",
+        "displayName": "Error",
+        "tonalRamp": [
+          "oklch(15% 0.1374 30.57)",
+          "oklch(26% 0.1374 30.57)",
+          "oklch(38% 0.1374 30.57)",
+          "oklch(49% 0.1374 30.57)",
+          "oklch(61% 0.1374 30.57)",
+          "oklch(72% 0.1374 30.57)",
+          "oklch(84% 0.1374 30.57)",
+          "oklch(95% 0.1374 30.57)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Page headline",
+        "purpose": "Page heading; mobile reduces to 28px."
+      },
+      "room-title": {
+        "displayName": "Room title",
+        "purpose": "Room grouping; mobile reduces to 18px."
+      },
+      "device-title": {
+        "displayName": "Device title",
+        "purpose": "Device identity; mobile reduces to 16px."
+      }
+    },
+    "shadows": [
+      {
+        "name": "switch-thumb",
+        "value": "0 1px 3px #0003",
+        "purpose": "Movable switch knob."
+      },
+      {
+        "name": "range-thumb",
+        "value": "0 2px 4px #182c1526",
+        "purpose": "Movable range thumb."
+      },
+      {
+        "name": "dialog",
+        "value": "0 30px 100px #1a2a1833",
+        "purpose": "Modal elevation; backdrop is #17221766 without blur."
+      }
+    ],
+    "motion": [
+      {
+        "name": "switch-thumb",
+        "value": "transform 140ms ease-out",
+        "purpose": "Power state position; disabled by reduced-motion preference."
+      },
+      {
+        "name": "shared-button",
+        "value": "background-color .2s",
+        "purpose": "Shared dialog-button hover; disabled by reduced-motion preference."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow-phone-max",
+        "value": "360px"
+      },
+      {
+        "name": "mobile-max",
+        "value": "760px"
+      },
+      {
+        "name": "single-column-desktop-max",
+        "value": "1020px"
+      },
+      {
+        "name": "compact-sidebar-max",
+        "value": "1190px"
+      },
+      {
+        "name": "three-column-min",
+        "value": "1800px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "description": "Dashboard action with a forest fill.",
+      "html": "<button class=\"ds-primary\">Connect Xiaomi</button>",
+      "css": ".ds-primary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:14px;font-weight:500;line-height:1.4;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:8px;border:1px solid transparent;padding:10px 14px;cursor:pointer;background:#315d47;color:#fff}.ds-primary:hover{background:#254b38}.ds-primary:focus-visible{outline:2px solid #315d47;outline-offset:4px}.ds-primary:disabled{opacity:.5;cursor:not-allowed}",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "description": "Bordered dashboard action.",
+      "html": "<button class=\"ds-secondary\">Refresh devices</button>",
+      "css": ".ds-secondary{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:14px;font-weight:500;line-height:1.4;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:8px;border:1px solid transparent;padding:10px 14px;cursor:pointer;background:#fff;color:#232822;border-color:#cbd2ca}.ds-secondary:hover{background:#edf1ec}.ds-secondary:focus-visible{outline:2px solid #315d47;outline-offset:4px}.ds-secondary:disabled{opacity:.5;cursor:not-allowed}",
+      "refersTo": "button-secondary"
+    },
+    {
+      "name": "Text action",
+      "kind": "button",
+      "description": "Low-emphasis dashboard action.",
+      "html": "<button class=\"ds-text\">Add device</button>",
+      "css": ".ds-text{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;font-size:14px;font-weight:500;line-height:1.4;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:8px;border:1px solid transparent;padding:10px 14px;cursor:pointer;padding-inline:8px;background:transparent;color:#315d47}.ds-text:hover{background:#e9eeea}.ds-text:focus-visible{outline:2px solid #315d47;outline-offset:4px}.ds-text:disabled{opacity:.5;cursor:not-allowed}",
+      "refersTo": "button-text"
+    },
+    {
+      "name": "Labeled field",
+      "kind": "input",
+      "description": "Native field with a visible label.",
+      "html": "<label class=\"ds-field\">Device name<input class=\"ds-input\" value=\"Living room fan\"></label>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:8px;font:14px -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#232822;min-width:0}.ds-input{font:inherit;border:1px solid #bcc5ba;border-radius:7px;background:#fff;color:#232822;padding:10px 12px;min-height:44px;width:100%}.ds-input:focus-visible{outline:2px solid #315d47;outline-offset:3px}.ds-input:disabled{opacity:.5;cursor:not-allowed}",
+      "refersTo": "field"
+    },
+    {
+      "name": "Desktop navigation",
+      "kind": "nav",
+      "description": "Labeled navigation with a pale selected state.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main\"><button class=\"ds-nav-item\" aria-current=\"page\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z\"/></svg>Home</button><button class=\"ds-nav-item\">Scenes</button></nav>",
+      "css": ".ds-nav{display:grid;gap:6px}.ds-nav-item{font:15px/1.45 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;align-items:center;gap:16px;min-height:48px;border:0;border-radius:8px;padding:10px 14px;text-align:left;background:transparent;color:#232822;cursor:pointer}.ds-nav-item:hover{background:#ebeeea}.ds-nav-item[aria-current]{background:#e1e9e3;color:#234e38;font-weight:600}.ds-nav-item:focus-visible{outline:2px solid #315d47;outline-offset:4px}.ds-nav-item:disabled{opacity:.5;cursor:not-allowed}"
+    },
+    {
+      "name": "Status badge",
+      "kind": "chip",
+      "description": "Shared pale green status badge.",
+      "html": "<span class=\"ds-badge\">Connected</span>",
+      "css": ".ds-badge{font:13px -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:inline-flex;align-items:center;gap:7px;color:#315d47;padding:6px 9px;background:#edf3eb;border:1px solid #cbd7ca;border-radius:7px}"
+    },
+    {
+      "name": "Device panel and power",
+      "kind": "card",
+      "description": "Flat device panel with labeled power and native More controls disclosure.",
+      "html": "<section class=\"ds-device\" aria-labelledby=\"ds-device-title\"><header class=\"ds-header\"><div class=\"ds-name\"><h3 id=\"ds-device-title\">Standing fan</h3><p>Living room</p></div><button class=\"ds-switch\" role=\"switch\" aria-label=\"Fan power\" aria-checked=\"true\"><span class=\"ds-track\"><span></span></span><span>On</span></button></header><details class=\"ds-more\"><summary>More controls<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></summary><p class=\"ds-detail\">Additional appliance settings</p></details></section>",
+      "css": ".ds-device{font:15px/1.45 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#232822;display:flex;flex-direction:column;min-width:0;background:#fff;border:1px solid #dfe3de;border-radius:10px;padding:24px 24px 0}.ds-header{display:flex;align-items:center;gap:16px;margin-bottom:28px}.ds-name{min-width:0;flex:1}.ds-name h3{font-size:17px;line-height:1.3;font-weight:650;margin:0;overflow-wrap:anywhere}.ds-name p{font-size:13px;color:#626862;margin:3px 0 0}.ds-switch{font-family:inherit;display:inline-flex;align-items:center;justify-content:flex-end;gap:9px;min-height:44px;flex-shrink:0;padding:4px 0 4px 4px;color:#232822;background:transparent;border:0;font-size:14px;cursor:pointer}.ds-switch>span:last-child{min-width:21px;text-align:left}.ds-track{display:block;width:48px;height:28px;border-radius:20px;padding:3px;background:#858d85;box-sizing:border-box}.ds-track>span{display:block;width:22px;height:22px;border-radius:50%;background:white;box-shadow:0 1px 3px #0003;transition:transform 140ms ease-out}.ds-switch[aria-checked=\"true\"] .ds-track{background:#315d47}.ds-switch[aria-checked=\"true\"] .ds-track>span{transform:translateX(20px)}.ds-more{margin-top:24px;border-top:1px solid #dfe3de}.ds-more>summary{display:flex;justify-content:space-between;gap:12px;align-items:center;min-height:56px;cursor:pointer;list-style:none;font-size:14px}.ds-more>summary::-webkit-details-marker{display:none}.ds-more>summary:hover{color:#315d47}.ds-more[open]>summary>svg{transform:rotate(90deg)}.ds-more>summary:focus-visible{outline:2px solid #315d47;outline-offset:4px}.ds-detail{font-size:13px;line-height:1.6;color:#626862;margin:0;padding:20px 0 24px;border-top:1px solid #dfe3de}.ds-switch:focus-visible{outline:2px solid #315d47;outline-offset:4px}.ds-switch:disabled{opacity:.5;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-track>span{transition:none}}",
+      "refersTo": "device-panel"
+    }
+  ],
+  "narrative": {
+    "northStar": "Everyday appliance controls",
+    "overview": "Jarvis uses the user-approved reference in `docs/design-reference.png`: light neutral surfaces, forest-green states, system sans typography and familiar labeled controls. Density serves quick reading and direct adjustment. Room and device names establish hierarchy without decorative imagery.",
+    "keyCharacteristics": [
+      "Flat white panels on a light neutral canvas.",
+      "Visible device state and directly available appliance controls.",
+      "Room groups that reflow into a single mobile column."
+    ],
+    "rules": [
+      {
+        "name": "The State Rule",
+        "body": "Pair color with labels, position or visible selection; preserve On/Off text beside power switches.",
+        "section": "colors"
+      },
+      {
+        "name": "The Flat Panel Rule",
+        "body": "Use borders and surface contrast for ordinary containers; reserve elevation for movable control parts and modal dialogs.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep primary appliance controls and labeled power directly available.",
+      "**Do** retain visible keyboard focus and at least 44px primary control targets.",
+      "**Do** group devices by room and preserve the control order on mobile.",
+      "**Do** show unverified or offline state alongside retained readings."
+    ],
+    "donts": [
+      "**Don't** add decorative device renders, oversized greetings or dashboard metrics.",
+      "**Don't** use atmospheric gradients; gradients belong to control fill or physical light temperature.",
+      "**Don't** replace labeled navigation or control state with icons or color alone."
+    ]
+  }
+}

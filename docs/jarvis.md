@@ -78,10 +78,19 @@ vp run check
 vp run build:jarvis
 NITRO_PRESET=vercel vp run build
 vp run -F @personal/jarvis test:e2e
+vp run -F @personal/jarvis test:e2e:auth
 ```
 
 Root unit tests include Jarvis's backend, protocol, fan, and HTTP boundary suites.
-Playwright runs separately through the portfolio proxy and uses the existing ignored
-owner credentials. Its device commands are intercepted with fixtures. Session cookies
-are HttpOnly, SameSite=Strict, scoped to `/jarvis`, and Secure for HTTPS browser origins;
-logout expires the cookie at the same path.
+The default Playwright suite launches an isolated `/jarvis` preview with fixture devices
+and intercepted commands. It covers direct power, light and fan controls, secondary
+settings, failure states, and screen widths from 320px to 1920px without loading credentials.
+The separate `test:e2e:auth` suite runs through the portfolio proxy using existing ignored
+owner credentials. It checks sign-in, reload, origin rejection, and sign-out without
+controlling devices. Set `JARVIS_TEST_URL=https://juicecolored.com` to verify production.
+Session cookies are HttpOnly, SameSite=Strict, scoped to `/jarvis`, and Secure for HTTPS
+browser origins; logout expires the cookie at the same path.
+
+The dashboard prioritizes power, brightness, fan speed, and oscillation, with secondary
+actions under More controls. Design context and the approved reference live in
+`apps/jarvis/PRODUCT.md`, `apps/jarvis/DESIGN.md`, and `apps/jarvis/docs/design-contract.md`.

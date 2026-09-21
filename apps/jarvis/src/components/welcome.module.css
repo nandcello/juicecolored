@@ -1,0 +1,70 @@
+.page {
+  min-height: 100dvh;
+  padding: 32px clamp(20px, 5vw, 72px);
+  background: #f6f7f5;
+  color: #232822;
+}
+.brand {
+  font-size: 30px;
+  font-weight: 750;
+  letter-spacing: -1px;
+}
+.content {
+  width: 100%;
+  max-width: 400px;
+  margin: clamp(64px, 15vh, 180px) auto 40px;
+}
+.content h1 {
+  font-size: 32px;
+  line-height: 1.2;
+  letter-spacing: -0.8px;
+  margin-bottom: 12px;
+}
+.content > p {
+  color: #626862;
+  line-height: 1.6;
+}
+.content form {
+  display: grid;
+  gap: 12px;
+  margin-top: 36px;
+}
+.content input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #bcc5ba;
+  border-radius: 8px;
+  padding: 12px;
+  background: white;
+  color: #232822;
+}
+.content button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 8px;
+  background: #315d47;
+  color: white;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.content button:hover {
+  background: #254b38;
+}
+.content small {
+  font-size: 13px;
+  color: #626862;
+  line-height: 1.6;
+}
+.content .error {
+  margin-top: 24px;
+  color: #9e392b;
+}
+.setup {
+  margin-top: 30px;
+  display: grid;
+  gap: 12px;
+  line-height: 1.6;
+}
+.setup h2 {
+  font-size: 20px;
+}

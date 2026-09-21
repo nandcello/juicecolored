@@ -36,7 +36,7 @@ assert.ok(Array.isArray(data.devices));
 assert.ok(!JSON.stringify(data).includes("encryptedSession"));
 const page = await fetch(origin + "/jarvis", { headers: { Cookie: cookie.split(";")[0] } });
 const html = await page.text();
-assert.ok(html.includes("Everything, just right."));
+assert.ok(html.includes("My home"));
 console.log(
   "HTTP smoke passed: auth gate, cross-origin rejection, owner login, secure cookie, Convex snapshot, authenticated HTML.",
 );

@@ -12,7 +12,8 @@
     "convex:dev": "convex dev",
     "deploy": "convex deploy --cmd 'vp run build'",
     "format": "vp fmt .",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:auth": "playwright test --config playwright.auth.config.ts"
   },
   "dependencies": {
     "@stylexjs/stylex": "0.19.0",

@@ -23,9 +23,9 @@ test("proxy sign-in, session scope, reload, origin rejection and logout", async 
     .find((line) => line.startsWith("JARVIS_OWNER_PASSPHRASE="))!
     .slice("JARVIS_OWNER_PASSPHRASE=".length);
   await page.goto("/jarvis");
-  await page.getByLabel("Welcome home").fill(password);
+  await page.getByLabel("Owner passphrase").fill(password);
   await page.getByRole("button", { name: "Enter your home" }).click();
-  await expect(page.getByRole("heading", { name: "Everything, just right." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "My home", level: 1 })).toBeVisible();
 
   const cookie = (await context.cookies(`${origin}/jarvis`)).find(
     (entry) => entry.name === "jarvis_session",
@@ -40,7 +40,7 @@ test("proxy sign-in, session scope, reload, origin rejection and logout", async 
     false,
   );
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Everything, just right." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "My home", level: 1 })).toBeVisible();
 
   expect(
     (

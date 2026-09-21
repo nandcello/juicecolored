@@ -1,0 +1,70 @@
+{
+  "connected": true,
+  "region": "sg",
+  "scenes": [],
+  "activity": [],
+  "devices": [
+    {
+      "id": "fixture-fan",
+      "name": "Standing fan",
+      "room": "Living room",
+      "kind": "fan",
+      "provider": "xiaomi",
+      "model": "Mi Smart Standing Fan 2",
+      "online": true,
+      "updatedAt": 1789898400000,
+      "capabilities": ["power", "speed", "oscillation", "fanMode", "timer"],
+      "state": {
+        "power": true,
+        "speed": 45,
+        "mode": "straight",
+        "oscillating": true,
+        "angle": 90,
+        "offInMinutes": 0,
+        "indicator": true,
+        "sound": false,
+        "childLock": false
+      }
+    },
+    {
+      "id": "fixture-light",
+      "name": "Ceiling light",
+      "room": "Living room",
+      "kind": "light",
+      "provider": "xiaomi",
+      "model": "Yeelight 1S Color",
+      "online": true,
+      "updatedAt": 1789898400000,
+      "capabilities": ["power", "brightness", "temperature", "color", "scenes", "effects", "timer"],
+      "state": {
+        "power": true,
+        "brightness": 75,
+        "kelvin": 2700,
+        "color": "#edba77",
+        "mode": "white",
+        "flowing": false,
+        "offInMinutes": 0
+      }
+    },
+    {
+      "id": "fixture-bedroom",
+      "name": "Bedside lamp",
+      "room": "Bedroom",
+      "kind": "light",
+      "provider": "xiaomi",
+      "model": "Yeelight 1S Color",
+      "online": true,
+      "updatedAt": 1789898400000,
+      "capabilities": ["power", "brightness", "temperature", "color", "scenes", "effects", "timer"],
+      "state": {
+        "power": false,
+        "brightness": 35,
+        "kelvin": 2700,
+        "color": "#edba77",
+        "mode": "white",
+        "flowing": false,
+        "offInMinutes": 0
+      }
+    }
+  ]
+}
