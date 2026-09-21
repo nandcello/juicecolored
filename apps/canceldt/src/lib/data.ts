@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cacheLife, cacheTag } from "next/cache";
 import { fetchQuery } from "./convex-read";
 import { api } from "@personal/convex";
@@ -20,6 +21,6 @@ export async function detail(slug: string) {
   cacheLife({ stale: 0, revalidate: 30, expire: 60 });
   return fetchQuery(api.canceldt.public.detail, { slug }, convexOptions());
 }
-export async function search(q: string) {
+export const search = cache(async (q: string) => {
   return fetchQuery(api.canceldt.public.search, { q }, convexOptions());
-}
+});

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { socialImage } from "@/lib/metadata";
+import { metadataBase, socialImage } from "@/lib/metadata";
 import { MotionShell } from "@/components/motion-shell";
 import "@fontsource/barlow-condensed/latin-800.css";
 import "./globals.css";
 export const metadata: Metadata = {
+  metadataBase,
   title: { default: "CANCELDT. — Check the list.", template: "%s · CANCELDT." },
   description: "A name, a reason, and the deets. Search CANCELDT’s curated published list.",
   openGraph: { images: [socialImage] },

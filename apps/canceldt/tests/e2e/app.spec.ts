@@ -4,6 +4,7 @@ import { SignJWT, importPKCS8 } from "jose";
 import { api } from "@personal/convex";
 import type { Id } from "@personal/convex/dataModel";
 import { resolve } from "node:path";
+import { writeFile } from "node:fs/promises";
 process.loadEnvFile(resolve(import.meta.dirname, "../../.env.local"));
 const ids: Id<"canceldtSubjects">[] = [];
 const prefix = `Fictional QA ${Date.now()}`;
@@ -144,9 +145,146 @@ test("detail affordances and private detail exclusion", async ({ page }) => {
   }
   await page.goto(`/canceldt?q=${encodeURIComponent(`${prefix} Reason`)}`);
   await expect(page.getByRole("link", { name: "The deets" })).toHaveCount(0);
+  await page.getByRole("link", { name: "View record" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(`${prefix} Reason`);
+  await expect(page.getByRole("button", { name: "Share", exact: true })).toBeVisible();
   const row = await client.query(api.canceldt.admin.subject, { id: ids[6] });
   await page.goto(`/canceldt/subject/${row!.slug}`);
   await expect(page.getByRole("heading", { name: "Nothing published here." })).toBeVisible();
+});
+test("sharing opens native share with a record permalink or an unlisted search", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async (data: ShareData) => {
+        sessionStorage.setItem("shared", JSON.stringify(data));
+      },
+    });
+  });
+  await page.goto(`/canceldt?q=${encodeURIComponent(`${prefix} Reason`)}`);
+  await page.getByRole("button", { name: "Share", exact: true }).click();
+  const shared = JSON.parse(await page.evaluate(() => sessionStorage.getItem("shared")!));
+  expect(shared.title).toBe(`${prefix} Reason is cancelled.`);
+  expect(shared.text).toBe("Fictional test entry. No real-world allegation.");
+  expect(shared.url).toContain("/canceldt/subject/");
+  expect(shared.url).not.toContain("?q=");
+  await page.goto(shared.url);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(`${prefix} Reason`);
+  await page.getByRole("button", { name: "Share", exact: true }).click();
+  expect(JSON.parse(await page.evaluate(() => sessionStorage.getItem("shared")!)).url).toBe(
+    shared.url,
+  );
+  await page.goto("/canceldt");
+  await page.getByRole("button", { name: "Share", exact: true }).first().click();
+  expect(JSON.parse(await page.evaluate(() => sessionStorage.getItem("shared")!)).title).toBe(
+    `${prefix} Sixth is cancelled.`,
+  );
+  const query = "UnlistedZyxÉ & NobodyZyx? #987654321%";
+  await page.goto(`/canceldt?q=${encodeURIComponent(query)}`);
+  await page.getByRole("button", { name: "Share", exact: true }).click();
+  const unlisted = JSON.parse(await page.evaluate(() => sessionStorage.getItem("shared")!));
+  expect(unlisted.title).toBe(`${query} is not cancelled.`);
+  expect(new URL(unlisted.url).searchParams.get("q")).toBe(query);
+  await page.goto(unlisted.url);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(query);
+});
+
+test("sharing cancellation, clipboard fallback and denied clipboard remain usable", async ({
+  page,
+}) => {
+  await page.goto("/canceldt?q=UnlistedZyxShareFallback");
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async () => {
+        throw new DOMException("Cancelled", "AbortError");
+      },
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (url: string) => {
+          sessionStorage.setItem("copied", url);
+        },
+      },
+    });
+  });
+  await page.getByRole("button", { name: "Share", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Share", exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => sessionStorage.getItem("copied"))).toBeNull();
+  await expect(page.getByText("Sharing is unavailable.", { exact: false })).toHaveCount(0);
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, "share", { configurable: true, value: undefined }),
+  );
+  await page.getByRole("button", { name: "Share", exact: true }).click();
+  await expect(page.getByText("Link copied.")).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem("copied"))).toContain(
+    "/canceldt?q=UnlistedZyxShareFallback",
+  );
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async () => {
+          throw new Error("Denied");
+        },
+      },
+    }),
+  );
+  await page.getByRole("button", { name: "Share", exact: true }).click();
+  await expect(page.getByLabel("Share link")).toHaveValue(
+    /\/canceldt\?q=UnlistedZyxShareFallback$/,
+  );
+});
+
+test("sharing previews are crawler-readable PNGs and exclude private records", async ({
+  request,
+}, testInfo) => {
+  for (const query of [`${prefix} Café`, "UnlistedZyxPreview", prefix]) {
+    const response = await request.get(`/canceldt?q=${encodeURIComponent(query)}`, {
+      headers: { "User-Agent": "Twitterbot/1.0" },
+    });
+    expect(response.ok()).toBe(true);
+    const html = await response.text();
+    const head = html.split("</head>")[0];
+    expect(head).toContain('property="og:title"');
+    const imageUrl = head.match(/property="og:image" content="([^"]+)"/)?.[1];
+    expect(imageUrl).toContain("/canceldt/api/og?");
+    const url = new URL(imageUrl!.replaceAll("&amp;", "&"));
+    const image = await request.get(url.pathname + url.search);
+    expect(image.status()).toBe(200);
+    expect(image.headers()["content-type"]).toContain("image/png");
+    const png = await image.body();
+    expect(png.readUInt32BE(16)).toBe(1200);
+    expect(png.readUInt32BE(20)).toBe(630);
+  }
+  const row = await client.query(api.canceldt.admin.subject, { id: ids[0] });
+  const response = await request.get(`/canceldt/subject/${encodeURIComponent(row!.slug)}`, {
+    headers: { "User-Agent": "Twitterbot/1.0" },
+  });
+  const head = (await response.text()).split("</head>")[0];
+  expect(head).toContain(`content="${prefix} Café is cancelled."`);
+  expect(head).toContain("Fictional test entry. No real-world allegation.");
+  expect(
+    (await request.get(`/canceldt/api/og?slug=${encodeURIComponent(row!.slug)}`)).status(),
+  ).toBe(200);
+  const draft = await client.query(api.canceldt.admin.subject, { id: ids[6] });
+  expect((await request.get(`/canceldt/api/og?slug=${draft!.slug}`)).status()).toBe(404);
+  expect((await request.get("/canceldt/api/og?q=" + "x".repeat(161))).status()).toBe(400);
+  expect((await request.get("/canceldt/api/og?q=%20%20")).status()).toBe(400);
+  const id = await client.mutation(api.canceldt.admin.save, {
+    subject: `${prefix} ${"W".repeat(160 - prefix.length - 1)}`,
+    oneLineReason: "W".repeat(240),
+    sources: [],
+    publicationState: "published",
+  });
+  ids.push(id);
+  const long = await client.query(api.canceldt.admin.subject, { id });
+  const longImage = await request.get(`/canceldt/api/og?slug=${long!.slug}`);
+  expect(longImage.status()).toBe(200);
+  await writeFile(testInfo.outputPath("long-preview.png"), await longImage.body());
 });
 test("pending search hides the previous verdict", async ({ page }) => {
   await page.goto("/canceldt?q=NoSuchFictionalSubject");

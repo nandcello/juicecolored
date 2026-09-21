@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@personal/convex";
+import { ShareButton } from "./share-button";
+import { subjectPath } from "@/lib/share";
 type Entry = FunctionReturnType<typeof api.canceldt.public.latest>[number];
 export function date(value: number) {
   return new Intl.DateTimeFormat("en", {
@@ -11,7 +13,7 @@ export function date(value: number) {
   }).format(value);
 }
 export function detailHref(slug: string, query?: string) {
-  return `/subject/${encodeURIComponent(slug)}${query ? `?q=${encodeURIComponent(query)}` : ""}`;
+  return `${subjectPath(slug)}${query ? `?q=${encodeURIComponent(query)}` : ""}`;
 }
 export function Entries({ entries, query }: { entries: Entry[]; query?: string }) {
   return (
@@ -21,21 +23,21 @@ export function Entries({ entries, query }: { entries: Entry[]; query?: string }
           <span className="entry-number" aria-hidden="true">
             {String(index + 1).padStart(2, "0")}
           </span>
-          {entry.hasDetails ? (
-            <Link className="entry-body entry-link" href={detailHref(entry.slug, query)}>
-              <h2>{entry.subject}</h2>
-              <p>{entry.oneLineReason}</p>
-              <span className="deets">The deets →</span>
-            </Link>
-          ) : (
-            <div className="entry-body">
-              <h2>{entry.subject}</h2>
-              <p>{entry.oneLineReason}</p>
-            </div>
-          )}
-          <time dateTime={new Date(entry.publishedAt).toISOString()}>
-            {date(entry.publishedAt)}
-          </time>
+          <Link className="entry-body entry-link" href={detailHref(entry.slug, query)}>
+            <h2>{entry.subject}</h2>
+            <p>{entry.oneLineReason}</p>
+            <span className="deets">{entry.hasDetails ? "The deets →" : "View record →"}</span>
+          </Link>
+          <div className="entry-actions">
+            <time dateTime={new Date(entry.publishedAt).toISOString()}>
+              {date(entry.publishedAt)}
+            </time>
+            <ShareButton
+              path={subjectPath(entry.slug)}
+              title={`${entry.subject} is cancelled.`}
+              text={entry.oneLineReason}
+            />
+          </div>
         </li>
       ))}
     </ol>

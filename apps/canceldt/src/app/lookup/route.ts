@@ -32,12 +32,12 @@ export async function GET(request: Request) {
     } else {
       const result = q ? await search(q) : null;
       if (result?.exact)
-        body = `<h1>${escape(result.exact.subject)} is cancelled.</h1><p>${escape(result.exact.oneLineReason)}</p>${result.exact.hasDetails ? `<a href="/canceldt/lookup?slug=${encodeURIComponent(result.exact.slug)}">The deets →</a>` : ""}<p class="quiet">An entry in CANCELDT’s curated published list.</p>`;
+        body = `<h1>${escape(result.exact.subject)} is cancelled.</h1><p>${escape(result.exact.oneLineReason)}</p><a href="/canceldt/lookup?slug=${encodeURIComponent(result.exact.slug)}">${result.exact.hasDetails ? "The deets →" : "View record →"}</a><p class="quiet">An entry in CANCELDT’s curated published list.</p>`;
       else if (result && !result.matches.length)
         body = `<h1>${escape(q)} is not cancelled.</h1><p>No entry in CANCELDT’s published list.</p><a href="${report(q)}">Should be cancelled? Report it.</a>`;
       else {
         const entries = result?.matches ?? (await latest());
-        body = `<h1>${q ? "Matching subjects" : "LATEST CANCELS"}</h1>${entries.length ? `<ol>${entries.map((entry) => `<li><h2>${escape(entry.subject)}</h2><p>${escape(entry.oneLineReason)}</p><small>${new Date(entry.publishedAt).toISOString().slice(0, 10)}</small>${entry.hasDetails ? `<p><a href="/canceldt/lookup?slug=${encodeURIComponent(entry.slug)}">The deets →</a></p>` : ""}</li>`).join("")}</ol>` : "<p>No cancels. Yet.</p>"}`;
+        body = `<h1>${q ? "Matching subjects" : "LATEST CANCELS"}</h1>${entries.length ? `<ol>${entries.map((entry) => `<li><h2>${escape(entry.subject)}</h2><p>${escape(entry.oneLineReason)}</p><small>${new Date(entry.publishedAt).toISOString().slice(0, 10)}</small><p><a href="/canceldt/lookup?slug=${encodeURIComponent(entry.slug)}">${entry.hasDetails ? "The deets →" : "View record →"}</a></p></li>`).join("")}</ol>` : "<p>No cancels. Yet.</p>"}`;
       }
     }
   } catch {

@@ -4,6 +4,32 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { detail } from "@/lib/data";
 import { date } from "@/components/entries";
+import type { Metadata } from "next";
+import { previewMetadata, subjectPreview } from "@/lib/metadata";
+import { subjectPath } from "@/lib/share";
+import { ShareButton } from "@/components/share-button";
+
+async function loadSubject(slug: string) {
+  // Client navigation can preserve percent escapes in dynamic route parameters.
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(slug);
+  } catch {
+    notFound();
+  }
+  return detail(decoded);
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const entry = await loadSubject(slug);
+  if (!entry) notFound();
+  return previewMetadata(subjectPreview(entry), { slug: entry.slug });
+}
 export default function Page(props: {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ q?: string | string[] }>;
@@ -22,13 +48,7 @@ async function Subject({
   searchParams: Promise<{ q?: string | string[] }>;
 }) {
   const [{ slug }, search] = await Promise.all([params, searchParams]);
-  let decodedSlug: string;
-  try {
-    decodedSlug = decodeURIComponent(slug);
-  } catch {
-    notFound();
-  }
-  const entry = await detail(decodedSlug);
+  const entry = await loadSubject(slug);
   if (!entry) notFound();
   const q = typeof search.q === "string" && search.q.length <= 160 ? search.q : "";
   return (
@@ -40,6 +60,11 @@ async function Subject({
       <p className="eyebrow red">CANCELLED · THE DEETS</p>
       <h1>{entry.subject}</h1>
       <p className="reason">{entry.oneLineReason}</p>
+      <ShareButton
+        path={subjectPath(entry.slug)}
+        title={`${entry.subject} is cancelled.`}
+        text={entry.oneLineReason}
+      />
       {entry.description ? <div className="description">{entry.description}</div> : null}
       {entry.sources.length ? (
         <section className="sources">

@@ -219,6 +219,38 @@ header {
   color: var(--muted);
   white-space: nowrap;
 }
+.entry-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  max-width: 220px;
+}
+.result-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.result-actions .deets {
+  margin-top: 0;
+}
+.share-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 12px;
+}
+.share-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+.share-control input {
+  width: 100%;
+  font-size: 13px;
+}
 .verdict {
   padding: 12px 0 35px;
 }
@@ -576,8 +608,11 @@ footer a {
     gap: 10px;
     padding: 20px 0;
   }
-  .entries time {
+  .entry-actions {
     grid-column: 2;
+    align-items: flex-start;
+  }
+  .entries time {
     padding-top: 0;
   }
   .entry-body p {

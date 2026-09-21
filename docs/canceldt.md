@@ -6,13 +6,18 @@ CANCELDT is an isolated Next.js App Router workspace in `apps/canceldt`, mounted
 
 - `/canceldt`: latest five published subjects, by first publication time.
 - `/canceldt?q=…`: server-rendered search, first `q` wins when repeated. Native GET uses the complete-HTML `/canceldt/lookup` fallback without JavaScript (with a canonical link to `/canceldt?q=…`); enhancement uses one history entry per submitted search. Empty/whitespace means latest.
-- `/canceldt/subject/<slug>`: published details only; optional `q` preserves return navigation.
+- `/canceldt/subject/<slug>`: shareable page for every published record, including headline-only entries; optional `q` preserves return navigation.
+- `/canceldt/api/og?slug=…` or `?q=…`: dynamic 1200×630 PNG preview, resolved from public data.
 - `/canceldt/report?subject=…`: private report/correction form.
 - `/canceldt/admin`: owner sign-in, Subjects and Reports.
 - `/calceldt/admin`: 308 redirect to the canonical administrator route.
 - `/canceldt/api/revalidate`: authenticated POST for external maintenance invalidation.
 
 Next Link/router paths are relative to Next's configured `/canceldt` basePath. Native form actions and server redirects include the mount explicitly. The header links only to CANCELDT; the landing-page backlink has been removed. The web Vite proxy and Nitro route rules preserve paths, query strings, Server Actions and `_next` assets. The typo redirect is handled by the main app in development and production.
+
+Share controls on search results, list entries, and record pages call the device's native Web Share API directly from the click. Browsers without it copy the permalink; if sharing or clipboard access fails, a selectable link is shown. Dismissing native sharing does not copy anything. Record shares omit the return-search query. Unlisted results share their search URL, so reopening it checks the current list rather than preserving an old verdict. Partial matches retain a neutral matching-subjects preview.
+
+Search and record pages provide server-rendered Open Graph/Twitter metadata with the subject, current verdict, and published headline. `CANCELDT_PUBLIC_ORIGIN` supplies canonical and preview-image origins. Images match the default OG artwork: cream paper, oversized uppercase Barlow display type, Geist supporting text, red punctuation, fine dividers, and the footer call to action. Fonts are bundled locally. Long subjects and headlines clamp to two lines. Images bypass CDN caching and follow the public data cache's existing revalidation window. Draft, archived, and missing records cannot generate record previews. Social platforms may retain their own previews after fetching them.
 
 ## Versions and implementation
 

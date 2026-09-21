@@ -5,7 +5,27 @@ import { latest, search } from "@/lib/data";
 import { cleanSubject } from "@personal/convex/canceldt-model";
 import { Entries, detailHref } from "@/components/entries";
 import { SearchForm } from "@/components/search-form";
+import { ShareButton } from "@/components/share-button";
+import { searchPath, subjectPath } from "@/lib/share";
+import { previewMetadata, searchPreview } from "@/lib/metadata";
+import type { Metadata } from "next";
 type Params = Promise<{ q?: string | string[] }>;
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Params;
+}): Promise<Metadata> {
+  const { q } = await searchParams;
+  const raw = Array.isArray(q) ? (q[0] ?? "") : (q ?? "");
+  if (raw.length > 160) return { title: "Check not run", robots: { index: false } };
+  const query = cleanSubject(raw);
+  if (!query) return {};
+  try {
+    return previewMetadata(searchPreview(query, await search(query)), { query });
+  } catch {
+    return { title: "Couldn’t check the list", robots: { index: false } };
+  }
+}
 export default function Page({ searchParams }: { searchParams: Params }) {
   return (
     <Suspense
@@ -69,11 +89,16 @@ async function Results({ searchParams }: { searchParams: Params }) {
               <span className="red">is cancelled.</span>
             </h1>
             <p className="reason">{result.exact.oneLineReason}</p>
-            {result.exact.hasDetails ? (
+            <div className="result-actions">
               <Link className="deets" href={detailHref(result.exact.slug, query)}>
-                The deets →
+                {result.exact.hasDetails ? "The deets →" : "View record →"}
               </Link>
-            ) : null}
+              <ShareButton
+                path={subjectPath(result.exact.slug)}
+                title={`${result.exact.subject} is cancelled.`}
+                text={result.exact.oneLineReason}
+              />
+            </div>
             <p className="quiet context">An entry in CANCELDT’s curated published list.</p>
           </section>
         );
@@ -85,6 +110,11 @@ async function Results({ searchParams }: { searchParams: Params }) {
               <span>Select the subject you mean</span>
             </div>
             <Entries entries={result.matches} query={query} />
+            <ShareButton
+              path={searchPath(query)}
+              title={`Matching subjects for ${query}`}
+              text="Select the subject you mean on CANCELDT."
+            />
             {result.matches.length === 20 ? (
               <p className="quiet">
                 Showing the first 20 matches. Refine the name to narrow the list.
@@ -102,6 +132,11 @@ async function Results({ searchParams }: { searchParams: Params }) {
               is not cancelled.
             </h1>
             <p className="quiet">No entry in CANCELDT’s published list.</p>
+            <ShareButton
+              path={searchPath(query)}
+              title={`${query} is not cancelled.`}
+              text="No entry in CANCELDT’s published list."
+            />
             <Link
               prefetch={false}
               className="report-link"
