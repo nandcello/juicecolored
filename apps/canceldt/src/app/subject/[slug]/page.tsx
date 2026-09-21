@@ -60,11 +60,7 @@ async function Subject({
       <p className="eyebrow red">CANCELLED · THE DEETS</p>
       <h1>{entry.subject}</h1>
       <p className="reason">{entry.oneLineReason}</p>
-      <ShareButton
-        path={subjectPath(entry.slug)}
-        title={`${entry.subject} is cancelled.`}
-        text={entry.oneLineReason}
-      />
+      <ShareButton path={subjectPath(entry.slug)} />
       {entry.description ? <div className="description">{entry.description}</div> : null}
       {entry.sources.length ? (
         <section className="sources">

@@ -93,11 +93,7 @@ async function Results({ searchParams }: { searchParams: Params }) {
               <Link className="deets" href={detailHref(result.exact.slug, query)}>
                 {result.exact.hasDetails ? "The deets →" : "View record →"}
               </Link>
-              <ShareButton
-                path={subjectPath(result.exact.slug)}
-                title={`${result.exact.subject} is cancelled.`}
-                text={result.exact.oneLineReason}
-              />
+              <ShareButton path={subjectPath(result.exact.slug)} />
             </div>
             <p className="quiet context">An entry in CANCELDT’s curated published list.</p>
           </section>
@@ -110,11 +106,7 @@ async function Results({ searchParams }: { searchParams: Params }) {
               <span>Select the subject you mean</span>
             </div>
             <Entries entries={result.matches} query={query} />
-            <ShareButton
-              path={searchPath(query)}
-              title={`Matching subjects for ${query}`}
-              text="Select the subject you mean on CANCELDT."
-            />
+            <ShareButton path={searchPath(query)} />
             {result.matches.length === 20 ? (
               <p className="quiet">
                 Showing the first 20 matches. Refine the name to narrow the list.
@@ -132,11 +124,7 @@ async function Results({ searchParams }: { searchParams: Params }) {
               is not cancelled.
             </h1>
             <p className="quiet">No entry in CANCELDT’s published list.</p>
-            <ShareButton
-              path={searchPath(query)}
-              title={`${query} is not cancelled.`}
-              text="No entry in CANCELDT’s published list."
-            />
+            <ShareButton path={searchPath(query)} />
             <Link
               prefetch={false}
               className="report-link"

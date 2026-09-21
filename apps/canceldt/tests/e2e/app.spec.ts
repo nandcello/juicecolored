@@ -152,9 +152,7 @@ test("detail affordances and private detail exclusion", async ({ page }) => {
   await page.goto(`/canceldt/subject/${row!.slug}`);
   await expect(page.getByRole("heading", { name: "Nothing published here." })).toBeVisible();
 });
-test("sharing opens native share with a record permalink or an unlisted search", async ({
-  page,
-}) => {
+test("sharing opens native share with only a record permalink or search URL", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -166,26 +164,30 @@ test("sharing opens native share with a record permalink or an unlisted search",
   await page.goto(`/canceldt?q=${encodeURIComponent(`${prefix} Reason`)}`);
   await page.getByRole("button", { name: "Share", exact: true }).click();
   const shared = JSON.parse(await page.evaluate(() => sessionStorage.getItem("shared")!));
-  expect(shared.title).toBe(`${prefix} Reason is cancelled.`);
-  expect(shared.text).toBe("Fictional test entry. No real-world allegation.");
+  expect(shared).toEqual({ url: expect.any(String) });
   expect(shared.url).toContain("/canceldt/subject/");
   expect(shared.url).not.toContain("?q=");
   await page.goto(shared.url);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(`${prefix} Reason`);
   await page.getByRole("button", { name: "Share", exact: true }).click();
-  expect(JSON.parse(await page.evaluate(() => sessionStorage.getItem("shared")!)).url).toBe(
-    shared.url,
-  );
+  expect(JSON.parse(await page.evaluate(() => sessionStorage.getItem("shared")!))).toEqual({
+    url: shared.url,
+  });
   await page.goto("/canceldt");
   await page.getByRole("button", { name: "Share", exact: true }).first().click();
-  expect(JSON.parse(await page.evaluate(() => sessionStorage.getItem("shared")!)).title).toBe(
-    `${prefix} Sixth is cancelled.`,
-  );
+  expect(JSON.parse(await page.evaluate(() => sessionStorage.getItem("shared")!))).toEqual({
+    url: expect.stringContaining("/canceldt/subject/"),
+  });
+  await page.goto(`/canceldt?q=${encodeURIComponent(prefix)}`);
+  await page.getByRole("button", { name: "Share", exact: true }).last().click();
+  const matches = JSON.parse(await page.evaluate(() => sessionStorage.getItem("shared")!));
+  expect(matches).toEqual({ url: expect.any(String) });
+  expect(new URL(matches.url).searchParams.get("q")).toBe(prefix);
   const query = "UnlistedZyxÉ & NobodyZyx? #987654321%";
   await page.goto(`/canceldt?q=${encodeURIComponent(query)}`);
   await page.getByRole("button", { name: "Share", exact: true }).click();
   const unlisted = JSON.parse(await page.evaluate(() => sessionStorage.getItem("shared")!));
-  expect(unlisted.title).toBe(`${query} is not cancelled.`);
+  expect(unlisted).toEqual({ url: expect.any(String) });
   expect(new URL(unlisted.url).searchParams.get("q")).toBe(query);
   await page.goto(unlisted.url);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(query);

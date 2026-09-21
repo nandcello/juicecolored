@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { publicPath } from "@/lib/share";
 
-export function ShareButton({ path, title, text }: { path: string; title: string; text: string }) {
+export function ShareButton({ path }: { path: string }) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [manualUrl, setManualUrl] = useState("");
@@ -16,7 +16,7 @@ export function ShareButton({ path, title, text }: { path: string; title: string
     try {
       if (typeof navigator.share === "function") {
         // Call directly from the click, before any await, to preserve user activation.
-        await navigator.share({ title, text, url });
+        await navigator.share({ url });
       } else {
         await navigator.clipboard.writeText(url);
         setMessage("Link copied.");

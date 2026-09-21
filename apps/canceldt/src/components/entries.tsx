@@ -32,11 +32,7 @@ export function Entries({ entries, query }: { entries: Entry[]; query?: string }
             <time dateTime={new Date(entry.publishedAt).toISOString()}>
               {date(entry.publishedAt)}
             </time>
-            <ShareButton
-              path={subjectPath(entry.slug)}
-              title={`${entry.subject} is cancelled.`}
-              text={entry.oneLineReason}
-            />
+            <ShareButton path={subjectPath(entry.slug)} />
           </div>
         </li>
       ))}
