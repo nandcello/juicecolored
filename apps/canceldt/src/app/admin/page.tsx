@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { fetchQuery } from "@/lib/convex-read";
 import { api } from "@personal/convex";
+import type { FunctionReturnType } from "convex/server";
 import type { Id } from "@personal/convex/dataModel";
 import { requireAdmin, authConfigured, AdminSessionError } from "@/lib/auth";
 import { convexOptions } from "@/lib/data";
@@ -11,6 +12,28 @@ import { SearchSummary } from "@/components/search-summary";
 export const metadata = { title: "Admin", robots: { index: false, follow: false } };
 type Params = Record<string, string | string[] | undefined>;
 const value = (p: Params, key: string) => (typeof p[key] === "string" ? (p[key] as string) : "");
+async function PendingReportsBadge({ token }: { token: string }) {
+  const options = { ...convexOptions(), token };
+  let count = 0;
+  let cursor: string | null = null;
+  // Count the whole pending queue, including reports beyond the first page.
+  for (;;) {
+    const result: FunctionReturnType<typeof api.canceldt.admin.reports> = await fetchQuery(
+      api.canceldt.admin.reports,
+      { moderationState: "pending", cursor },
+      options,
+    );
+    count += result.page.length;
+    if (result.isDone) break;
+    cursor = result.continueCursor;
+  }
+  return count > 0 ? (
+    <span className="admin-pending-badge">
+      {count}
+      <span className="sr-only"> pending {count === 1 ? "report" : "reports"} to review</span>
+    </span>
+  ) : null;
+}
 export default function Page({ searchParams }: { searchParams: Promise<Params> }) {
   return (
     <Suspense fallback={<p role="status">Checking administrator access…</p>}>
@@ -200,6 +223,9 @@ async function Admin({ searchParams }: { searchParams: Promise<Params> }) {
           aria-current={section === "reports" ? "page" : undefined}
         >
           Reports
+          <Suspense fallback={null}>
+            <PendingReportsBadge token={token} />
+          </Suspense>
         </Link>
         <Link href="/">View public list ↗</Link>
       </nav>

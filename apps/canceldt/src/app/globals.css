@@ -491,6 +491,21 @@ header {
   font-weight: 700;
   color: var(--red);
 }
+.admin-pending-badge {
+  display: inline-block;
+  min-width: 20px;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--red);
+  color: var(--paper);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  text-align: center;
+  vertical-align: middle;
+}
 .admin-tools {
   display: flex;
   align-items: center;
