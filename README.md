@@ -1,5 +1,22 @@
 Jarvis home controls now live in `apps/jarvis` and are served at `/jarvis`: [development and deployment](docs/jarvis.md).
 
+## Production hosting
+
+This repository uses **three required Vercel projects** under `alt164`, all connected
+to `nandcello/juicecolored` with production branch `master`:
+
+| Public path | Vercel project | Source                                  | Upstream                     |
+| ----------- | -------------- | --------------------------------------- | ---------------------------- |
+| `/`         | `juicecolored` | `apps/web` (build from repository root) | Main site                    |
+| `/jarvis`   | `jarvis`       | `apps/jarvis`                           | `jarvis-pi-brown.vercel.app` |
+| `/canceldt` | `canceldt`     | `apps/canceldt`                         | `canceldt.vercel.app`        |
+
+The main site proxies the two app paths; its deployment does not build or host
+those apps. Deleting either app project breaks its public path, even though the
+source remains in this repository. Each project's production environment variables
+and hostname must be retained. See [CANCELDT deployment](docs/canceldt.md#schema-and-deployment)
+and [Jarvis deployment](docs/jarvis.md#production-deployments) for configuration.
+
 Dependency versions, compatibility decisions, and validation notes: [September 2026 upgrade](docs/dependency-upgrade-2026-09.md).
 
 Spam filtering endpoints, local setup, and migration notes: [Spam filter API](docs/spam-api.md).
