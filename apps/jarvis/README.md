@@ -35,6 +35,8 @@ The generated owner passphrase is the `JARVIS_OWNER_PASSPHRASE` entry in `.env.c
 
 - Yeelight lights and Mi Smart Standing Fan 2 (`dmaker.fan.p18`), selection, rooms and per-device labels.
 - Fan power, 1–100 speed, straight/natural wind, oscillation and angle, left/right adjustment, off timer, indicator, sound and child lock.
+- **Fan direction** offers a draggable, keyboard-accessible 140° arc. Turn off oscillation and child lock, then choose **Calibrate direction**. Step to the left limit, confirm it, and count rightward steps until the right limit. Jarvis saves the travel measurement in this browser; later calibrations only need alignment at the left limit. **Measure travel again** replaces that measurement.
+- Direction is an **estimate**, not a device reading: this model only accepts left/right nudges. Release the arc to send a bounded sequence of acknowledged steps, spaced by at least 1.5 seconds. All dashboard controls stay busy during the sequence. **Stop after this step**, leaving the controls, backgrounding the page, or a failed command cancels the remaining steps without retrying. Oscillation, power/lock/online changes and manual direction commands clear the estimate. Recalibrate after movement in Xiaomi Home, another browser or by hand. Position is never restored from browser storage.
 - **Device settings → Hide device** removes a device from the dashboard and scene targets. **Settings → Hidden devices → Restore** brings it back. Visibility persists through rediscovery and does not change the physical device.
 - Power, brightness, 1700–6500K white temperature and RGB colors.
 - Adjustable transitions, four built-in scenes and saved scenes.

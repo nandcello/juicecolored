@@ -172,7 +172,12 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
                                 void task({ type: "refresh", id: d.id }, `${d.name} refreshed.`),
                             };
                             return d.kind === "fan" ? (
-                              <FanControls key={d.id} device={d} {...shared} />
+                              <FanControls
+                                key={d.id}
+                                device={d}
+                                {...shared}
+                                onMove={(move) => controller.moveFan(d.id, move)}
+                              />
                             ) : (
                               <LightControls
                                 key={d.id}

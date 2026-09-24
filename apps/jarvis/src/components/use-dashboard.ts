@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { LightDevice, Scene, Snapshot } from "@/lib/domain";
 import { request } from "@/lib/client";
+import { runFanMovement, type FanMove } from "@/lib/fan-direction";
 
 export type View = "devices" | "scenes" | "activity" | "settings";
 export type Dialog = "connect" | "save" | "device" | "disconnect" | "help" | null;
@@ -84,7 +85,11 @@ export function useDashboard(initial: Snapshot) {
     };
   }, [refreshIds]);
 
-  async function task(operation: Record<string, unknown>, message?: string) {
+  async function task(
+    operation: Record<string, unknown>,
+    message?: string,
+    perform = () => request(operation),
+  ) {
     if (working.current) {
       setNotice({
         text: "A request is in progress. Give it a moment, then try again.",
@@ -96,7 +101,7 @@ export function useDashboard(initial: Snapshot) {
     setBusy(true);
     setNotice(null);
     try {
-      const result = await request(operation);
+      const result = await perform();
       if (operation.type === "logout") return result;
       const next = await request<Snapshot>();
       if (!alive.current) return;
@@ -121,6 +126,44 @@ export function useDashboard(initial: Snapshot) {
   }
   async function command(id: string, action: string, data: Record<string, unknown> = {}) {
     await task({ type: "control", id, action, data });
+  }
+  async function moveFan(id: string, move: FanMove) {
+    const operation = {
+      type: "control",
+      id,
+      action: "direction",
+      data: { direction: move.direction },
+    };
+    const result = await task(operation, undefined, async () => {
+      // Keep the dashboard's operation lock for the entire sequence, including
+      // motor settling time. The server still validates and leases each nudge.
+      const checkReady = (snapshot: Snapshot) => {
+        const fan = snapshot.devices.find((d) => d.id === id);
+        if (
+          fan?.kind !== "fan" ||
+          !fan.online ||
+          !fan.updatedAt ||
+          !fan.state.power ||
+          fan.state.oscillating ||
+          fan.state.childLock
+        )
+          throw new Error(
+            "Fan direction is unavailable. Turn off oscillation and child lock, then recalibrate.",
+          );
+      };
+      checkReady(await request<Snapshot>());
+      const completed = await runFanMovement(move, async () => {
+        if (document.hidden)
+          throw new Error("Fan movement stopped. Recalibrate before aiming again.");
+        const response = await request(operation);
+        if (response.warning) throw new Error(String(response.warning));
+        const next = await request<Snapshot>();
+        checkReady(next);
+        if (alive.current) setState(next);
+      });
+      return { ok: completed };
+    });
+    return result?.ok === true;
   }
   function openDevice(id: string, nextDialog: "device" | "save") {
     setSelected(id);
@@ -196,6 +239,7 @@ export function useDashboard(initial: Snapshot) {
     setRegion,
     task,
     command,
+    moveFan,
     openDevice,
     closeDialog,
     openConnect,

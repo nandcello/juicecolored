@@ -1,0 +1,97 @@
+.control {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+.control > button {
+  justify-self: start;
+}
+.heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.heading output {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.arc {
+  width: 100%;
+  max-width: 340px;
+  aspect-ratio: 300 / 170;
+  margin: 4px auto 0;
+  touch-action: none;
+  cursor: grab;
+  border-radius: 12px;
+}
+.arc:active {
+  cursor: grabbing;
+}
+.arc:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 4px;
+}
+.arc[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+  touch-action: auto;
+}
+.arc svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.sector {
+  fill: #f1f5f0;
+}
+.track {
+  fill: none;
+  stroke: #bacabd;
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.centerLine {
+  fill: none;
+  stroke: #bacabd;
+  stroke-width: 1;
+  stroke-dasharray: 4 5;
+}
+.needle {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 3;
+}
+.handle {
+  fill: white;
+  stroke: var(--green);
+  stroke-width: 4;
+}
+.pivot {
+  fill: var(--green);
+}
+.labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.setup {
+  display: grid;
+  gap: 10px;
+  border-radius: 8px;
+  background: var(--canvas);
+  padding: 14px;
+  font-size: 13px;
+}
+.setup > button {
+  justify-self: start;
+}

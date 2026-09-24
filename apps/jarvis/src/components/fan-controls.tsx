@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, MoveHorizontal } from "lucide-react";
 import type { FanDevice } from "@/lib/domain";
+import type { MoveFan } from "@/lib/fan-direction";
+import { FanDirection } from "./fan-direction";
 import { DeviceCard, Range, Switch, type Command } from "./device-controls";
 import c from "./dashboard.module.css";
 
@@ -12,15 +14,18 @@ export function FanControls({
   onCommand,
   onSettings,
   onRefresh,
+  onMove,
 }: {
   device: FanDevice;
   busy: boolean;
   onCommand: Command;
   onSettings: () => void;
   onRefresh: () => void;
+  onMove: MoveFan;
 }) {
   const state = device.state;
   const [minutes, setMinutes] = useState(String(state.offInMinutes || 60));
+  const [directionVersion, setDirectionVersion] = useState(0);
   const disabled = busy || !device.online || device.updatedAt <= 0;
   const stopped = disabled || !state.power;
   const supports = (capability: FanDevice["capabilities"][number]) =>
@@ -54,14 +59,20 @@ export function FanControls({
                 <button
                   className={c.button}
                   disabled={stopped}
-                  onClick={() => void onCommand("direction", { direction: "left" })}
+                  onClick={() => {
+                    setDirectionVersion((v) => v + 1);
+                    void onCommand("direction", { direction: "left" });
+                  }}
                 >
                   <ArrowLeft size={16} /> Turn left
                 </button>
                 <button
                   className={c.button}
                   disabled={stopped}
-                  onClick={() => void onCommand("direction", { direction: "right" })}
+                  onClick={() => {
+                    setDirectionVersion((v) => v + 1);
+                    void onCommand("direction", { direction: "right" });
+                  }}
                 >
                   Turn right <ArrowRight size={16} />
                 </button>
@@ -173,6 +184,21 @@ export function FanControls({
             ))}
           </div>
         </div>
+      )}
+      {supports("oscillation") && (
+        <FanDirection
+          key={`${directionVersion}:${state.power}:${state.oscillating}:${state.childLock}:${device.online}`}
+          deviceId={device.id}
+          disabled={stopped || state.oscillating || state.childLock}
+          unavailable={
+            state.oscillating
+              ? "Turn off oscillation to aim the fan."
+              : state.childLock
+                ? "Turn off child lock to aim the fan."
+                : undefined
+          }
+          onMove={onMove}
+        />
       )}
     </DeviceCard>
   );
