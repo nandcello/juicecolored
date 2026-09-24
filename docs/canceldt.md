@@ -1,6 +1,6 @@
 # CANCELDT
 
-CANCELDT is an isolated Next.js App Router workspace in `apps/canceldt`, mounted through the existing TanStack/Nitro main site. It uses the existing shared Convex project. It does not replace the homepage or change Jarvis authentication, UI, or its deployment.
+CANCELDT is an isolated Next.js App Router workspace in `apps/canceldt`, mounted through the Next.js main site. It uses the existing shared Convex project. It does not replace the homepage or change Jarvis authentication, UI, or its deployment.
 
 ## Routes
 
@@ -15,7 +15,7 @@ CANCELDT is an isolated Next.js App Router workspace in `apps/canceldt`, mounted
 - `/calceldt/admin`: 308 redirect to the canonical administrator route.
 - `/canceldt/api/revalidate`: authenticated POST for external maintenance invalidation.
 
-Next Link/router paths are relative to Next's configured `/canceldt` basePath. Native form actions and server redirects include the mount explicitly. The header links only to CANCELDT; the landing-page backlink has been removed. The web Vite proxy and Nitro route rules preserve paths, query strings, Server Actions and `_next` assets. The typo redirect is handled by the main app in development and production.
+Next Link/router paths are relative to Next's configured `/canceldt` basePath. Native form actions and server redirects include the mount explicitly. The header links only to CANCELDT; the landing-page backlink has been removed. The main site's Next.js rewrites preserve paths, query strings, Server Actions and `_next` assets. The typo redirect is handled by the main app in development and production.
 
 Share controls on search results, list entries, and record pages call the device's native Web Share API directly from the click. Browsers without it copy the permalink; if sharing or clipboard access fails, a selectable link is shown. Dismissing native sharing does not copy anything. Record shares omit the return-search query. Unlisted results share their search URL, so reopening it checks the current list rather than preserving an old verdict. Partial matches retain a neutral matching-subjects preview.
 
@@ -35,7 +35,7 @@ Major files:
 - `packages/convex/convex/canceldt`: validators, public queries, privileged queries/mutations, private report storage and spam verification.
 - `packages/convex/convex/schema.ts`: additive CANCELDT tables/indexes.
 - `packages/convex/convex/auth.config.ts`: Convex-supported ES256 custom JWT verification.
-- `apps/web/vite.config.ts`: main-domain mount and typo redirect.
+- `apps/web/next.config.ts`: main-domain mount and typo redirect.
 
 ## Local setup
 

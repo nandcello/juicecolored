@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test, vi } from "vitest";
-import { handleSpamRequest } from "./handler.server";
+import { handleSpamRequest } from "./handler";
 
 afterEach(() => vi.unstubAllEnvs());
 

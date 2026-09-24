@@ -25,7 +25,7 @@ Set `JARVIS_PUBLIC_ORIGIN=https://juicecolored.localhost` in Jarvis's environmen
 Use `apps/jarvis/.env.example` for new checkouts. Existing private local development
 configuration was copied into the ignored Jarvis environment files during migration.
 
-`apps/web/vite.config.ts` proxies `/jarvis` and descendants, including Next.js assets,
+`apps/web/next.config.ts` rewrites `/jarvis` and descendants, including Next.js assets,
 API requests, and development WebSockets. Next.js uses `basePath: "/jarvis"`.
 The browser API endpoint is `/jarvis/api/jarvis`; the portfolio's `/api/*` routes
 remain available. Use normal anchors for navigation between the apps.
@@ -59,8 +59,8 @@ separate development backend.
 
 Deploy Jarvis first and verify `/jarvis` and `/jarvis/api/jarvis` on its stable
 `jarvis-pi-brown.vercel.app` alias. Sign-in is intended through the configured browser
-origin; direct upstream writes are rejected. The portfolio's Nitro build emits external
-rewrites for `/jarvis` and `/jarvis/(.*)` before its catch-all route. After deploying
+origin; direct upstream writes are rejected. The portfolio's Next.js build emits external
+rewrites for `/jarvis` and `/jarvis/:path*`. After deploying
 the portfolio, verify sign-in, reload, and sign-out at `https://juicecolored.com/jarvis`.
 
 The two Vercel projects build independently. The root build continues to build the
@@ -76,7 +76,7 @@ vp check
 vp test
 vp run check
 vp run build:jarvis
-NITRO_PRESET=vercel vp run build
+CANCELDT_ORIGIN=https://canceldt.vercel.app vp run build
 vp run -F @personal/jarvis test:e2e
 vp run -F @personal/jarvis test:e2e:auth
 ```

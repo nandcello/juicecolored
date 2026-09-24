@@ -1,4 +1,6 @@
-import { SmallPleasures } from "./small-pleasures";
+"use client";
+
+import { Fragment } from "react";
 import {
   Cover,
   Introduction,
@@ -9,7 +11,7 @@ import {
 } from "./spreads";
 import { useBookNavigation } from "./use-book-navigation";
 
-import type { PortfolioStatusProps } from "./small-pleasures";
+import type { ReactNode } from "react";
 
 const chapters = [
   { id: "cover", className: "cover", name: "Cover" },
@@ -21,7 +23,7 @@ const chapters = [
   { id: "contact", className: "contact", name: "The next chapter" },
 ];
 
-export function PortfolioBook(props: PortfolioStatusProps) {
+export function PortfolioBook({ pleasures }: { pleasures: ReactNode }) {
   const { bookRef, current, contentsOpen, setContentsOpen, go } = useBookNavigation(
     chapters.length,
   );
@@ -31,7 +33,7 @@ export function PortfolioBook(props: PortfolioStatusProps) {
     <IndependentProjects key="independent" />,
     <Studio key="studio" onNavigate={go} />,
     <StudioProjects key="studio-projects" />,
-    <SmallPleasures key="pleasures" {...props} />,
+    <Fragment key="pleasures">{pleasures}</Fragment>,
     <Contact key="contact" onNavigate={go} />,
   ];
 

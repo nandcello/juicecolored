@@ -1,2 +1,6 @@
-
 .env.local
+.next/
+*.tsbuildinfo
+next-env.d.ts
+playwright-report/
+test-results/

@@ -1,6 +1,6 @@
 # Spam filter API
 
-The Hinto spam filter now runs inside the web app through a TanStack Start server route. Its Effect classifier calls `typesafe-ai/jev` through Vercel AI Gateway, with no dependency on the old Cloudflare Worker. The Gateway SDK represents TypeSafe's Noul probability as a `boolean` evaluation question; the integration and verdict semantics are unchanged.
+The Hinto spam filter now runs inside the web app through a Next.js route handler (`apps/web/src/app/api/[[...path]]/route.ts`). Its Effect classifier calls `typesafe-ai/jev` through Vercel AI Gateway, with no dependency on the old Cloudflare Worker. The Gateway SDK represents TypeSafe's Noul probability as a `boolean` evaluation question; the integration and verdict semantics are unchanged.
 
 Source: `nandcello/hinto` at `437bf1617ebb8cd7a28c93bd5af14560f5676989`.
 
@@ -16,7 +16,7 @@ Both POST routes require `Authorization: Bearer <API_AUTH_TOKEN>` and `Content-T
 
 ## Local configuration
 
-Set these server-only variables in `apps/web/.env.local` (ignored by Git). Nitro loads this file for server configuration; Vite's root `envDir` is used for the existing frontend configuration.
+Set these server-only variables in `apps/web/.env.local` (ignored by Git). Next.js loads this file.
 
 | Variable             | Purpose                                                                        |
 | -------------------- | ------------------------------------------------------------------------------ |
@@ -24,7 +24,7 @@ Set these server-only variables in `apps/web/.env.local` (ignored by Git). Nitro
 | `API_AUTH_TOKEN`     | Required shared bearer token for API callers                                   |
 | `JEV_TIMEOUT_MS`     | Per-email deadline, including one SDK retry; defaults to 10000, range 1–120000 |
 
-The existing Hinto credentials can be reused. Do not prefix secrets with `VITE_`. Start the app with `vp run dev`; the current local base URL is `https://juicecolored.localhost`. Use `portless list` to confirm the address and restart the dev server after changing secrets.
+The existing Hinto credentials can be reused. Do not prefix secrets with `NEXT_PUBLIC_`. Start the app with `vp run dev`; the current local base URL is `https://juicecolored.localhost`. Use `portless list` to confirm the address and restart the dev server after changing secrets.
 
 After exporting `API_AUTH_TOKEN` in your shell:
 
@@ -65,6 +65,6 @@ No email data is stored in Convex. Application warnings contain sanitized failur
 
 Run `vp check`, `vp test run`, and `vp run build`. The migrated tests use an injected mock provider to verify the real SDK adapter, authentication, validation, streamed size limits, probability boundaries, upstream cancellation, batch ordering and concurrency, and per-item failures.
 
-For deployment, configure the two secrets on the existing Vercel project and set `JEV_TIMEOUT_MS=10000`. Nitro configures a 60-second Vercel function duration to cover five evaluation deadlines plus overhead. Higher deadlines require increasing the function duration and a compatible hosting plan. Test authenticated single and batch requests after deployment; health alone does not verify inference availability.
+For deployment, configure the two secrets on the existing Vercel project and set `JEV_TIMEOUT_MS=10000`. The route handler sets a 60-second `maxDuration` to cover five evaluation deadlines plus overhead. Higher deadlines require increasing the function duration and a compatible hosting plan. Test authenticated single and batch requests after deployment; health alone does not verify inference availability.
 
 The production paths are `https://juicecolored.com/api/spam` and `https://juicecolored.com/api/spam/batch`. Deployment uses the existing Vercel project and the build command in `vercel.json`, which also deploys the Convex backend. The existing service at `spam.juicecolored.com` remains available. Switch callers to the new paths after production verification, then retire the Worker separately.

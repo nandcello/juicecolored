@@ -1,8 +1,10 @@
+"use client";
+
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 
 import type { ReactNode } from "react";
 
-const convexUrl = import.meta.env.VITE_CONVEX_URL;
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 
 export const hasConvexUrl = Boolean(convexUrl);
 

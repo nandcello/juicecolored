@@ -13,7 +13,7 @@
     "dev:mobile": "vp run -F @personal/mobile start",
     "go:testflight": "vp run -F @personal/mobile go:testflight",
     "build": "vp run -F @personal/web build",
-    "preview": "vp run -F @personal/web preview",
+    "start": "vp run -F @personal/web start",
     "check": "vp check && vp run -F @personal/mobile lint && vp run -F @personal/jarvis lint && vp run -F @personal/jarvis typecheck",
     "test": "vp test run",
     "prepare": "vp config",

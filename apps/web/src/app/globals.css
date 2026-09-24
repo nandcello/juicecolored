@@ -1,6 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Caslon+Display&display=swap");
 @import "tailwindcss";
-@import "./components/portfolio/portfolio.css";
+@import "../components/portfolio/portfolio.css";
 
 @theme {
   --font-sans: "DM Sans", Arial, sans-serif;
