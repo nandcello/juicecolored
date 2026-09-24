@@ -103,9 +103,11 @@ test("serves public assets", async ({ request }) => {
 
 test("hydrates without errors and loads Vercel Analytics", async ({ page }) => {
   const errors: string[] = [];
-  // Development builds load the debug script from Vercel's CDN.
+  // Development loads the debug script from Vercel's CDN; production may use an obscured path.
   const analytics = page.waitForRequest((request) =>
-    /\/_vercel\/insights\/script\.js|va\.vercel-scripts\.com\//.test(request.url()),
+    /\/_vercel\/insights\/script\.js|va\.vercel-scripts\.com\/|\/[0-9a-f]{16}\/script\.js$/.test(
+      request.url(),
+    ),
   );
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
