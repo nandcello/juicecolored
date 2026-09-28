@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "portless juicecolored next dev --webpack",
-    "build": "next build --webpack",
+    "build": "node ../../packages/jarvis/scripts/prepare-web-assets.mjs && next build --webpack",
     "start": "next start",
     "typecheck": "next typegen --webpack && node ../../node_modules/@typescript/native/bin/tsc --noEmit --incremental false",
     "check": "vp check",

@@ -52,6 +52,8 @@ Deploy the Convex backend from this package with `vp run convex:deploy`, then de
 
 `node scripts/configure-vercel.mjs` explicitly targets the shared web project's Vercel directory and uploads its two Jarvis server secrets from this package's credential file. It requires the web project to be linked and should run only when that production secret upload is intended.
 
+The shared web build runs `scripts/prepare-web-assets.mjs` before Next.js. When `VERCEL=1`, it replaces the two host icon symlinks with identical regular files because Vercel's output packager cannot copy these cross-workspace links. The source remains `src/assets/icon.svg`; ordinary local builds leave the tracked symlinks unchanged. Both icon URLs and their bytes are preserved.
+
 ## Verify
 
 From this package:
