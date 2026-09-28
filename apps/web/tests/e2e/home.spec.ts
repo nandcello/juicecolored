@@ -192,6 +192,15 @@ test("renders each spread identically", async ({ page }) => {
     if (index > 0) await page.getByRole("button", { name: "Next spread" }).click();
     await expect(page.locator("#chapter-label")).toHaveText(name.toUpperCase());
     await page.waitForTimeout(300);
+    // Lazy images affect the gallery's intrinsic height and the adjacent text's
+    // vertical centering even when their pixels are masked.
+    if (index === 5) {
+      await page
+        .locator(".food-gallery img")
+        .evaluateAll((images) =>
+          Promise.all(images.map((image) => (image as HTMLImageElement).decode())),
+        );
+    }
     await expect(page).toHaveScreenshot(`spread-${index + 1}.png`, {
       // Live Convex data changes between runs.
       mask: [page.locator(".music-note"), page.locator(".food-gallery")],

@@ -14,3 +14,10 @@ todos.json
 .antigravitycli/5e0fa7ff-1594-492f-9899-c2c876714974.json
 
 .vercel
+
+# Generated frontend/test output, including retired app directories.
+.next/
+*.tsbuildinfo
+next-env.d.ts
+playwright-report/
+test-results/

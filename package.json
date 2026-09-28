@@ -7,23 +7,25 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "vp run --parallel -F @personal/web -F @personal/jarvis -F @personal/canceldt dev",
+    "dev": "vp run -F @personal/web dev",
     "dev:web": "vp run -F @personal/web dev",
     "dev:convex": "vp run -F @personal/convex dev",
     "dev:mobile": "vp run -F @personal/mobile start",
     "go:testflight": "vp run -F @personal/mobile go:testflight",
     "build": "vp run -F @personal/web build",
     "start": "vp run -F @personal/web start",
-    "check": "vp check && vp run -F @personal/mobile lint && vp run -F @personal/jarvis lint && vp run -F @personal/jarvis typecheck",
+    "check": "vp check && vp run -F @personal/mobile lint && vp run -F @personal/jarvis lint && vp run -F @personal/web typecheck && vp run -F @personal/jarvis typecheck && vp run -F @personal/canceldt typecheck && vp run -F @personal/convex typecheck",
     "test": "vp test run",
     "prepare": "vp config",
-    "dev:jarvis": "vp run -F @personal/jarvis dev",
+    "dev:jarvis": "vp run -F @personal/web dev",
     "dev:jarvis:convex": "vp run -F @personal/jarvis convex:dev",
-    "build:jarvis": "vp run -F @personal/jarvis build",
-    "dev:canceldt": "vp run -F @personal/canceldt dev",
-    "build:canceldt": "vp run -F @personal/canceldt build"
+    "build:jarvis": "vp run -F @personal/web build",
+    "dev:canceldt": "vp run -F @personal/web dev",
+    "build:canceldt": "vp run -F @personal/web build"
   },
   "devDependencies": {
+    "@typescript/native": "npm:typescript@7.0.2",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.3.3",
     "vite-plus": "0.3.3",
     "vitest": "4.1.11"

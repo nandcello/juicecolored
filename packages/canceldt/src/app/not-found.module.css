@@ -1,0 +1,122 @@
+.document {
+  color-scheme: light;
+  --paper: #f7f6f2;
+  --ink: #181817;
+  --muted: #65635f;
+  --line: #d5d3cc;
+  --red: #c82c27;
+  --display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.document,
+.document * {
+  box-sizing: border-box;
+}
+
+.document a {
+  color: inherit;
+  text-underline-offset: 4px;
+  touch-action: manipulation;
+}
+
+.document a:focus-visible {
+  outline: 3px solid var(--red);
+  outline-offset: 4px;
+}
+
+.document :global(.shell) {
+  max-width: 1120px;
+  padding: 28px 48px 0;
+  margin: auto;
+}
+
+.document header {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.document :global(.wordmark) {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(76px, 13.5vw, 166px);
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  text-decoration: none;
+  margin: 22px 0 30px;
+}
+
+.document :global(.wordmark) span {
+  color: var(--red);
+}
+
+.document :global(.empty) {
+  padding: 35px 0 55px;
+}
+
+.document :global(.empty) p {
+  color: var(--muted);
+}
+
+.document footer {
+  margin-top: 70px;
+  border-top: 1px solid var(--line);
+  padding: 22px 0 30px;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.document footer div {
+  display: flex;
+  gap: 18px;
+}
+
+.document footer a {
+  min-height: 30px;
+}
+
+.document :global(.skip) {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  padding: 10px;
+  background: var(--ink);
+  color: white;
+  z-index: 10;
+}
+
+.document :global(.skip):focus {
+  top: 10px;
+}
+
+@media (max-width: 600px) {
+  .document :global(.shell) {
+    padding: 22px 22px 0;
+  }
+
+  .document :global(.wordmark) {
+    font-size: clamp(70px, 20vw, 115px);
+    margin: 20px 0 28px;
+  }
+
+  .document footer {
+    margin-top: 48px;
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .document * {
+    scroll-behavior: auto !important;
+  }
+}

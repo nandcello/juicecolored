@@ -26,6 +26,7 @@
     "./canceldt-model": "./convex/canceldt/model.ts"
   },
   "scripts": {
+    "typecheck": "node ../../node_modules/@typescript/native/bin/tsc --noEmit --incremental false -p convex/tsconfig.json",
     "dev": "bun --env-file=../../.env.local convex dev",
     "codegen": "bun --env-file=../../.env.local convex codegen",
     "deploy": "bun --env-file=../../.env.local convex deploy",

@@ -1,0 +1,53 @@
+{
+  "name": "@personal/canceldt",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*",
+    "./app/admin/error": "./src/app/admin/error.tsx",
+    "./app/admin/page": "./src/app/admin/page.tsx",
+    "./app/admin/searches/page": "./src/app/admin/searches/page.tsx",
+    "./app/api/og/route": "./src/app/api/og/route.ts",
+    "./app/api/revalidate/route": "./src/app/api/revalidate/route.ts",
+    "./app/api/searches/route": "./src/app/api/searches/route.ts",
+    "./app/error": "./src/app/error.tsx",
+    "./app/layout": "./src/app/layout.tsx",
+    "./app/loading": "./src/app/loading.tsx",
+    "./app/lookup/route": "./src/app/lookup/route.ts",
+    "./app/not-found": "./src/app/not-found.tsx",
+    "./app/page": "./src/app/page.tsx",
+    "./app/report/page": "./src/app/report/page.tsx",
+    "./app/subject/[slug]/page": "./src/app/subject/[slug]/page.tsx",
+    "./model": "./convex/model.ts",
+    "./app/metadata": "./src/app/metadata.ts",
+    "./app/not-found-document": "./src/app/not-found-document.tsx"
+  },
+  "scripts": {
+    "typecheck": "node ../../node_modules/@typescript/native/bin/tsc --noEmit --incremental false",
+    "test": "vp test run --config vitest.config.ts",
+    "test:e2e": "playwright test",
+    "setup:local": "node scripts/setup-local.mjs"
+  },
+  "dependencies": {
+    "@fontsource/barlow-condensed": "^5.2.8",
+    "@personal/convex": "workspace:*",
+    "convex": "^1.46.0",
+    "jose": "6.2.12",
+    "next": "16.3.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "convex-test": "^0.0.59",
+    "typescript": "^7.0.2",
+    "vite-plus": "0.3.3",
+    "vitest": "4.1.11"
+  }
+}

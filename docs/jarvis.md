@@ -1,96 +1,62 @@
-# Jarvis in the monorepo
+# Jarvis in the shared Next.js app
 
-Jarvis is the `@personal/jarvis` workspace in `apps/jarvis`. The portfolio remains
-`@personal/web` in `apps/web`. Jarvis keeps Next.js, StyleX, its owner authentication,
-and its own Convex deployment and data. It is not part of the portfolio's React bundle.
-
-The source was imported from the sibling `jarvis` repository without removing that
-checkout. Its package lock is replaced by the root `bun.lock`. Protocol attribution
-and existing tests are retained. React and Convex versions align with the workspace.
+`packages/jarvis` owns Jarvis's UI, StyleX/CSS Modules, owner authentication, domain
+contracts, tests and independent Convex backend. Thin route entries in
+`apps/web/src/app/(jarvis)` serve `/jarvis` and `/jarvis/api/jarvis` in the same Next.js
+process as the portfolio and CANCELDT. Its root layout owns the document and styles.
 
 ## Local development
 
 ```sh
 vp install
+node apps/web/scripts/migrate-local-env.mjs # once for an existing checkout
 vp run dev
 ```
 
-This starts the portfolio through Portless and Jarvis on `127.0.0.1:3001`.
-Open `https://juicecolored.localhost/jarvis`.
-If the portfolio is already running, use `vp run dev:jarvis` instead.
-Run `vp run dev:jarvis:convex` separately when developing Jarvis's backend.
+Open `/jarvis` on the address shown by `portless list` (currently `https://juicecolored.local`). Run `vp run dev:jarvis:convex` separately
+when developing the backend. `packages/jarvis/.env.local` selects that Convex deployment;
+Next reads its runtime configuration from `apps/web/.env.local`:
 
-Jarvis reads `apps/jarvis/.env.local`; the portfolio reads the root `.env.local`.
-Set `JARVIS_PUBLIC_ORIGIN=https://juicecolored.localhost` in Jarvis's environment.
-Use `apps/jarvis/.env.example` for new checkouts. Existing private local development
-configuration was copied into the ignored Jarvis environment files during migration.
+- `JARVIS_CONVEX_URL`: Jarvis's existing Convex URL, separate from the portfolio's public URL.
+- `JARVIS_GATEWAY_SECRET`: existing gateway credential.
+- `JARVIS_SESSION_SECRET`: existing session signing secret.
+- `JARVIS_PUBLIC_ORIGIN`: browser origin; match the address shown by `portless list`.
 
-`apps/web/next.config.ts` rewrites `/jarvis` and descendants, including Next.js assets,
-API requests, and development WebSockets. Next.js uses `basePath: "/jarvis"`.
-The browser API endpoint is `/jarvis/api/jarvis`; the portfolio's `/api/*` routes
-remain available. Use normal anchors for navigation between the apps.
+Session cookies retain their name and seven-day lifetime. They are HttpOnly,
+SameSite=Strict, scoped to `/jarvis`, and Secure on HTTPS. Existing sessions remain valid
+when their signing secret is preserved. The API still checks write origins separately.
 
-To change the upstream, set `JARVIS_ORIGIN` in the portfolio build environment or
-root `.env.local`. The default is `http://127.0.0.1:3001` for development and
-`https://jarvis-pi-brown.vercel.app` for production. This is an upstream origin,
-without `/jarvis`; `JARVIS_PUBLIC_ORIGIN` is the origin the browser visits.
+## Deployment
 
-## Production deployments
+Deploy the frontend once, using the `juicecolored` project rooted at `apps/web`. Copy the
+existing production Jarvis runtime values into that project before deploying. Rename
+its former `NEXT_PUBLIC_CONVEX_URL` to `JARVIS_CONVEX_URL`; retain
+`JARVIS_PUBLIC_ORIGIN=https://juicecolored.com` and the existing secrets. No upstream
+origin, frontend proxy or separate Jarvis Next build is required.
 
-The existing `alt164/jarvis` Vercel project uses Root Directory `apps/jarvis`,
-Next.js, Node.js 22, and workspace files outside the root directory. Its production
-Convex URL, gateway secret, and session secret remain in that project.
-`JARVIS_PUBLIC_ORIGIN=https://juicecolored.com` validates browser writes and makes
-session cookies secure behind the portfolio proxy.
-
-Deploy from the monorepo root, in this order:
-
-```sh
-vercel deploy --project jarvis --scope alt164 --prod --local-config apps/jarvis/vercel.json
-vercel deploy --project juicecolored --scope alt164 --prod
-```
-
-The explicit Jarvis configuration prevents the portfolio's root `vercel.json` from
-being used for its build. The Jarvis install command runs Bun from the workspace root
-to bootstrap the locked dependencies, then `bun run build` invokes the Vite+ scripts.
-Local environment and credential files are excluded from the source upload; production
-values are supplied by Vercel. Preview deployments need their own browser origin and
-separate development backend.
-
-Deploy Jarvis first and verify `/jarvis` and `/jarvis/api/jarvis` on its stable
-`jarvis-pi-brown.vercel.app` alias. Sign-in is intended through the configured browser
-origin; direct upstream writes are rejected. The portfolio's Next.js build emits external
-rewrites for `/jarvis` and `/jarvis/:path*`. After deploying
-the portfolio, verify sign-in, reload, and sign-out at `https://juicecolored.com/jarvis`.
-
-The two Vercel projects build independently. The root build continues to build the
-portfolio; `vp run build:jarvis` builds Jarvis. This move does not require publishing
-Jarvis's Convex functions or moving database records. The portfolio deployment retains
-its existing Convex deployment build command. The previous standalone Jarvis root URL
-is replaced by `/jarvis`.
+The backend stays in the same Convex deployment with the same data. Its files now live
+at `packages/jarvis/convex`; deploy backend changes from that package using
+`vp run -F @personal/jarvis convex:deploy`. Never substitute development credentials in
+production. Keep the former standalone frontend deployment until the combined rollout
+has been verified.
 
 ## Verification
 
 ```sh
-vp check
-vp test
 vp run check
-vp run build:jarvis
-CANCELDT_ORIGIN=https://canceldt.vercel.app vp run build
+vp test run
+vp run build
 vp run -F @personal/jarvis test:e2e
 vp run -F @personal/jarvis test:e2e:auth
 ```
 
-Root unit tests include Jarvis's backend, protocol, fan, and HTTP boundary suites.
-The default Playwright suite launches an isolated `/jarvis` preview with fixture devices
-and intercepted commands. It covers direct power, light and fan controls, secondary
-settings, failure states, and screen widths from 320px to 1920px without loading credentials.
-The separate `test:e2e:auth` suite runs through the portfolio proxy using existing ignored
-owner credentials. It checks sign-in, reload, origin rejection, and sign-out without
-controlling devices. Set `JARVIS_TEST_URL=https://juicecolored.com` to verify production.
-Session cookies are HttpOnly, SameSite=Strict, scoped to `/jarvis`, and Secure for HTTPS
-browser origins; logout expires the cookie at the same path.
+The UI suite copies the combined Next app into a temporary test workspace and replaces
+only its Jarvis page/API with fixture data. It exercises controls, scenes, settings,
+authentication UI, failures and responsive layouts without sending commands to devices.
+The authentication suite uses ignored owner credentials and the real development
+backend to check sign-in, reload, origin rejection and sign-out without device control.
+Set `JARVIS_TEST_URL` to the unified development origin.
 
-The dashboard prioritizes power, brightness, fan speed, and oscillation, with secondary
-actions under More controls. Design context and the approved reference live in
-`apps/jarvis/PRODUCT.md`, `apps/jarvis/DESIGN.md`, and `apps/jarvis/docs/design-contract.md`.
+Design references and protocol attribution remain in `packages/jarvis/PRODUCT.md`,
+`packages/jarvis/DESIGN.md`, `packages/jarvis/docs/design-contract.md`, and
+`packages/jarvis/THIRD_PARTY.md`.
