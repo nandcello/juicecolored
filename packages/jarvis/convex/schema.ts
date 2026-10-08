@@ -29,7 +29,25 @@ export const sceneFields = {
   color: v.string(),
   brightness: v.number(),
 };
+export const fanMotion = v.object({
+  token: v.string(),
+  kind: v.union(v.literal("home"), v.literal("aim")),
+  direction: v.union(v.literal("left"), v.literal("right")),
+  target: v.number(),
+  steps: v.number(),
+  completed: v.number(),
+  inFlight: v.boolean(),
+  stopping: v.boolean(),
+  expiresAt: v.number(),
+});
 export default defineSchema({
+  fanDirections: defineTable({
+    deviceId: v.id("devices"),
+    travelSteps: v.number(),
+    position: v.union(v.number(), v.null()),
+    motion: v.optional(fanMotion),
+    error: v.optional(v.string()),
+  }).index("by_deviceId", ["deviceId"]),
   integrations: defineTable({
     provider: v.literal("xiaomi"),
     encryptedSession: v.string(),

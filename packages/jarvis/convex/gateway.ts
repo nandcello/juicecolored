@@ -37,6 +37,19 @@ const controlData = v.object({
   ),
 });
 const operation = v.union(
+  v.object({
+    type: v.literal("fanHome"),
+    id: v.id("devices"),
+    travelSteps: v.optional(v.number()),
+  }),
+  v.object({ type: v.literal("fanAim"), id: v.id("devices"), position: v.number() }),
+  v.object({
+    type: v.literal("fanReference"),
+    id: v.id("devices"),
+    travelSteps: v.number(),
+    position: v.number(),
+  }),
+  v.object({ type: v.literal("fanStop"), id: v.id("devices"), token: v.string() }),
   v.object({ type: v.literal("startLogin"), region: v.string() }),
   v.object({ type: v.literal("pollLogin"), key: v.string() }),
   v.object({ type: v.literal("discover") }),
@@ -140,11 +153,34 @@ export const execute = action({
       }))
     )
       throw new ConvexError("Too many requests. Wait a moment.");
+    // Cancellation must remain available while the background job owns the lease.
+    if (op.type === "fanStop") {
+      await ctx.runMutation(internal.fanMotion.stop, { deviceId: op.id, token: op.token });
+      return { ok: true };
+    }
     const token = randomUUID(),
       key = "xiaomi-owner";
     if (!(await ctx.runMutation(internal.store.acquire, { key, token })))
       throw new ConvexError("Another request is in progress. Try again in a moment.");
+    let backgroundOwnsLease = false;
     try {
+      if (op.type === "fanReference") {
+        await ctx.runMutation(internal.fanMotion.reference, {
+          deviceId: op.id,
+          travelSteps: op.travelSteps,
+          position: op.position,
+        });
+        return { ok: true };
+      }
+      if (op.type === "fanHome" || op.type === "fanAim") {
+        backgroundOwnsLease = await ctx.runMutation(internal.fanMotion.start, {
+          deviceId: op.id,
+          token,
+          kind: op.type === "fanHome" ? "home" : "aim",
+          ...(op.type === "fanHome" ? { travelSteps: op.travelSteps } : { target: op.position }),
+        });
+        return { ok: true };
+      }
       if (op.type === "startLogin") {
         if (
           !(await ctx.runMutation(internal.store.rateLimit, {
@@ -282,6 +318,8 @@ export const execute = action({
             }[op.action] ?? "Device updated");
       try {
         if (device.kind === "fan") {
+          if (["direction", "power", "oscillation", "angle", "childLock"].includes(op.action))
+            await ctx.runMutation(internal.store.invalidateFanDirection, { id: op.id });
           await controlFan(client, device.externalId, op.action, op.data);
         } else {
           const [method, params] = command(op.action, op.data);
@@ -322,7 +360,7 @@ export const execute = action({
         safe ? message : "The device service could not complete this request. Please try again.",
       );
     } finally {
-      await ctx.runMutation(internal.store.release, { key, token });
+      if (!backgroundOwnsLease) await ctx.runMutation(internal.store.release, { key, token });
     }
   },
 });

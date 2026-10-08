@@ -1,2 +1,4 @@
 import { defineConfig } from "vitest/config";
-export default defineConfig({ test: { include: ["tests/*.test.ts"], restoreMocks: true } });
+export default defineConfig({
+  test: { include: ["tests/*.test.ts", "convex/*.test.ts"], restoreMocks: true },
+});

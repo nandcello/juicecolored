@@ -43,7 +43,11 @@ type DeviceBase = {
   error?: string;
 };
 export type LightDevice = DeviceBase & { kind: "light"; state: LightState };
-export type FanDevice = DeviceBase & { kind: "fan"; state: FanState };
+export type FanDevice = DeviceBase & {
+  kind: "fan";
+  state: FanState;
+  direction?: import("./fan-direction").FanDirectionState;
+};
 export type Device = LightDevice | FanDevice;
 export type Scene = {
   id: string;

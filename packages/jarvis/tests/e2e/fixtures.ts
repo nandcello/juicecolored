@@ -11,6 +11,9 @@ export type Operation = {
   room?: string;
   region?: string;
   key?: string;
+  travelSteps?: number;
+  position?: number;
+  token?: string;
 };
 export type Simulation = {
   state: Snapshot;
@@ -18,6 +21,7 @@ export type Simulation = {
   failNext: boolean;
   delay: number;
   loginPending: boolean;
+  motionError: boolean;
 };
 export const test = base.extend<{ simulation: Simulation }>({
   simulation: async ({ page }, provide) => {
@@ -27,7 +31,9 @@ export const test = base.extend<{ simulation: Simulation }>({
       failNext: false,
       delay: 0,
       loginPending: true,
+      motionError: false,
     };
+    const motionTimers: ReturnType<typeof setInterval>[] = [];
     await page.route("**/api/jarvis", async (route) => {
       if (route.request().method() === "GET") return route.fulfill({ json: simulation.state });
       const op: Operation = route.request().postDataJSON();
@@ -57,6 +63,55 @@ export const test = base.extend<{ simulation: Simulation }>({
         return route.fulfill({ json: { connected: true } });
       }
       const device = simulation.state.devices.find((d) => d.id === op.id);
+      if (device?.kind === "fan") {
+        if (op.type === "fanReference")
+          device.direction = { travelSteps: op.travelSteps!, position: op.position! };
+        if (op.type === "fanHome" || op.type === "fanAim") {
+          const travelSteps = device.direction?.travelSteps ?? op.travelSteps!;
+          const target = op.type === "fanHome" ? 0 : op.position!;
+          const steps =
+            op.type === "fanHome" ? travelSteps : Math.abs(target - device.direction!.position!);
+          const token = `motion-${simulation.commands.length}`;
+          device.direction = {
+            travelSteps,
+            position: null,
+            motion: {
+              token,
+              kind: op.type === "fanHome" ? "home" : "aim",
+              steps,
+              completed: 0,
+              stopping: false,
+            },
+          };
+          const timer = setInterval(() => {
+            const state = device.direction;
+            if (state?.motion?.token !== token) {
+              clearInterval(timer);
+              return;
+            }
+            state.motion.completed++;
+            if (state.motion.completed >= steps || simulation.motionError) {
+              state.motion = undefined;
+              state.position = simulation.motionError ? null : target;
+              state.error = simulation.motionError
+                ? "Movement could not be confirmed. Calibrate again before aiming."
+                : undefined;
+              simulation.motionError = false;
+              clearInterval(timer);
+            }
+          }, 500);
+          motionTimers.push(timer);
+        }
+        if (
+          op.type === "fanStop" &&
+          device.direction?.motion &&
+          device.direction.motion.token === op.token
+        ) {
+          device.direction.motion = undefined;
+          device.direction.position = null;
+          device.direction.error = "Movement stopped. Calibrate again before aiming.";
+        }
+      }
       if (device && op.type === "visibility") device.hidden = op.hidden;
       if (device && op.type === "metadata") {
         device.name = op.name!;
@@ -84,6 +139,11 @@ export const test = base.extend<{ simulation: Simulation }>({
         if (op.action === "timer") device.state.offInMinutes = data.minutes as number;
         if (op.action === "cancelTimer") device.state.offInMinutes = 0;
         if (device.kind === "fan") {
+          if (
+            device.direction &&
+            ["direction", "power", "oscillation", "angle", "childLock"].includes(op.action ?? "")
+          )
+            device.direction.position = null;
           if (op.action === "speed") device.state.speed = data.speed as number;
           if (op.action === "fanMode") device.state.mode = data.mode as "straight" | "natural";
           if (op.action === "oscillation") device.state.oscillating = data.on as boolean;
@@ -106,7 +166,11 @@ export const test = base.extend<{ simulation: Simulation }>({
       }
       return route.fulfill({ json: { ok: true } });
     });
-    await provide(simulation);
+    try {
+      await provide(simulation);
+    } finally {
+      for (const timer of motionTimers) clearInterval(timer);
+    }
   },
 });
 export { expect } from "@playwright/test";

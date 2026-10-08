@@ -22,6 +22,8 @@ export function useDashboard(initial: Snapshot) {
   const [stale, setStale] = useState(false);
   const working = useRef(false);
   const alive = useRef(true);
+  const operationVersion = useRef(0);
+  const backgroundMoving = state.devices.some((d) => d.kind === "fan" && !!d.direction?.motion);
   const qrVersion = useRef(0);
   const shownDevices = state.devices.filter((d) => !d.hidden);
   const lights = shownDevices.filter((d): d is LightDevice => d.kind === "light");
@@ -36,23 +38,39 @@ export function useDashboard(initial: Snapshot) {
 
   useEffect(() => {
     alive.current = true;
-    const timer = setInterval(async () => {
-      if (working.current || document.hidden) return;
+    let polling = false;
+    let cancelled = false;
+    async function poll() {
+      if (working.current || document.hidden || polling) return;
+      polling = true;
+      const version = operationVersion.current;
       try {
         const next = await request<Snapshot>();
-        if (alive.current && !working.current) {
+        if (
+          !cancelled &&
+          alive.current &&
+          !working.current &&
+          operationVersion.current === version
+        ) {
           setState(next);
           setStale(false);
         }
       } catch {
-        if (alive.current) setStale(true);
+        if (!cancelled && alive.current) setStale(true);
+      } finally {
+        polling = false;
       }
-    }, 15000);
+    }
+    const timer = setInterval(poll, backgroundMoving ? 1500 : 15000);
+    document.addEventListener("visibilitychange", poll);
+    void poll();
     return () => {
+      cancelled = true;
       alive.current = false;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", poll);
     };
-  }, []);
+  }, [backgroundMoving]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,8 +79,9 @@ export function useDashboard(initial: Snapshot) {
     // One physical read per minute, rotating through visible devices. Never fan
     // out reads or retry commands: Xiaomi serializes operations per account.
     const timer = setInterval(async () => {
-      if (!ids.length || working.current || document.hidden) return;
+      if (!ids.length || working.current || document.hidden || backgroundMoving) return;
       working.current = true;
+      operationVersion.current++;
       setBusy(true);
       const id = ids[nextIndex++ % ids.length];
       try {
@@ -83,14 +102,14 @@ export function useDashboard(initial: Snapshot) {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [refreshIds]);
+  }, [refreshIds, backgroundMoving]);
 
   async function task(
     operation: Record<string, unknown>,
     message?: string,
     perform = () => request(operation),
   ) {
-    if (working.current) {
+    if (working.current || (backgroundMoving && operation.type !== "fanStop")) {
       setNotice({
         text: "A request is in progress. Give it a moment, then try again.",
         error: false,
@@ -98,6 +117,7 @@ export function useDashboard(initial: Snapshot) {
       return;
     }
     working.current = true;
+    operationVersion.current++;
     setBusy(true);
     setNotice(null);
     try {
@@ -114,6 +134,16 @@ export function useDashboard(initial: Snapshot) {
         });
       return result;
     } catch (error) {
+      // A lost start/stop response can still have changed the background job.
+      // Recover its recorded state without ever repeating the operation.
+      if (String(operation.type).startsWith("fan")) {
+        try {
+          const next = await request<Snapshot>();
+          if (alive.current) setState(next);
+        } catch {
+          /* Keep the original error; the normal snapshot poll will recover. */
+        }
+      }
       if (alive.current)
         setNotice({
           text: error instanceof Error ? error.message : "Could not complete the request.",
@@ -126,6 +156,10 @@ export function useDashboard(initial: Snapshot) {
   }
   async function command(id: string, action: string, data: Record<string, unknown> = {}) {
     await task({ type: "control", id, action, data });
+  }
+  async function fanTask(operation: Record<string, unknown>) {
+    const result = await task(operation);
+    return result?.ok === true;
   }
   async function moveFan(id: string, move: FanMove) {
     const operation = {
@@ -224,7 +258,7 @@ export function useDashboard(initial: Snapshot) {
     activeRoom,
     visible,
     shownDevices,
-    busy,
+    busy: busy || backgroundMoving,
     notice,
     dialog,
     qr,
@@ -240,6 +274,7 @@ export function useDashboard(initial: Snapshot) {
     task,
     command,
     moveFan,
+    fanTask,
     openDevice,
     closeDialog,
     openConnect,

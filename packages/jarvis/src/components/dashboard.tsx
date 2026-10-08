@@ -177,6 +177,25 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
                                 device={d}
                                 {...shared}
                                 onMove={(move) => controller.moveFan(d.id, move)}
+                                directionActions={{
+                                  home: (travelSteps) =>
+                                    controller.fanTask({
+                                      type: "fanHome",
+                                      id: d.id,
+                                      ...(travelSteps ? { travelSteps } : {}),
+                                    }),
+                                  aim: (position) =>
+                                    controller.fanTask({ type: "fanAim", id: d.id, position }),
+                                  reference: (travelSteps, position) =>
+                                    controller.fanTask({
+                                      type: "fanReference",
+                                      id: d.id,
+                                      travelSteps,
+                                      position,
+                                    }),
+                                  stop: (token) =>
+                                    controller.fanTask({ type: "fanStop", id: d.id, token }),
+                                }}
                               />
                             ) : (
                               <LightControls

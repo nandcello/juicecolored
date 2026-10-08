@@ -7,7 +7,10 @@ async function alignUsingSavedMeasurement(page: Page) {
   const fan = card(page, "Standing fan");
   await fan.getByRole("switch", { name: "Oscillate" }).click();
   await fan.getByRole("button", { name: "Calibrate direction" }).click();
-  await fan.getByRole("button", { name: "At left limit" }).click();
+  await expect(fan.getByRole("slider", { name: "Fan direction", exact: true })).toHaveAttribute(
+    "aria-valuenow",
+    "-70",
+  );
   return fan;
 }
 
@@ -42,8 +45,7 @@ test("measure travel, drag to aim, and keep the estimate separate from oscillati
   await expect(arc).toHaveAttribute("aria-disabled", "false", { timeout: 10000 });
   await expect(arc).toHaveAttribute("aria-valuenow", "0");
   expect(simulation.commands.slice(before)).toEqual([
-    { type: "control", id: "fixture-fan", action: "direction", data: { direction: "left" } },
-    { type: "control", id: "fixture-fan", action: "direction", data: { direction: "left" } },
+    { type: "fanAim", id: "fixture-fan", position: 2 },
   ]);
   const fanState = simulation.state.devices[0];
   expect(fanState.kind === "fan" && fanState.state.angle).toBe(90);
@@ -64,12 +66,14 @@ test("keyboard movement stops on failure and requires recalibration", async ({
 }) => {
   const fan = await alignUsingSavedMeasurement(page);
   const arc = fan.getByRole("slider", { name: "Fan direction", exact: true });
-  simulation.failNext = true;
+  simulation.motionError = true;
   const before = simulation.commands.length;
   await arc.press("End");
   await expect(fan.getByRole("button", { name: "Calibrate direction" })).toBeEnabled();
   await expect(arc).toHaveAttribute("aria-valuetext", "Not calibrated");
-  await expect(page.getByRole("main").getByRole("alert")).toContainText("did not confirm");
+  await expect(fan.getByRole("status", { name: "Fan direction status" })).toContainText(
+    "could not be confirmed",
+  );
   expect(simulation.commands).toHaveLength(before + 1);
 });
 
@@ -100,7 +104,7 @@ test("keyboard bounds and cancelled touch drags do not send stray commands", asy
   expect(simulation.commands).toHaveLength(before + 1);
 });
 
-test("stop cancels the remaining steps; a new session only remembers the travel measurement", async ({
+test("stop cancels the remaining steps and the saved measurement starts automatic calibration", async ({
   page,
   simulation,
 }) => {
@@ -111,14 +115,16 @@ test("stop cancels the remaining steps; a new session only remembers the travel 
   await expect.poll(() => simulation.commands.length).toBe(before + 1);
   await fan.getByRole("button", { name: "Stop after this step" }).click();
   await expect(fan.getByRole("button", { name: "Calibrate direction" })).toBeEnabled();
-  expect(simulation.commands).toHaveLength(before + 1);
+  expect(simulation.commands).toHaveLength(before + 2);
+  expect(simulation.commands.at(-1)?.type).toBe("fanStop");
   await page.reload();
   await expect(arc).toHaveAttribute("aria-valuetext", "Not calibrated");
   await fan.getByRole("button", { name: "Calibrate direction" }).click();
-  await expect(fan.getByText("Using your saved measurement: 4 steps across 140°.")).toBeVisible();
+  await expect(fan.getByRole("status", { name: "Fan movement" })).toContainText("Calibrating");
+  await expect(arc).toHaveAttribute("aria-valuenow", "-70");
 });
 
-test("leaving the controls cancels the sequence and manual nudges invalidate the estimate", async ({
+test("leaving the controls preserves the background job while manual nudges invalidate the estimate", async ({
   page,
   simulation,
 }) => {
@@ -128,14 +134,42 @@ test("leaving the controls cancels the sequence and manual nudges invalidate the
   await fan.getByRole("button", { name: "Turn left", exact: true }).click();
   await expect(arc).toHaveAttribute("aria-valuetext", "Not calibrated");
   await fan.getByRole("button", { name: "Calibrate direction" }).click();
-  await fan.getByRole("button", { name: "At left limit" }).click();
+  await expect(arc).toHaveAttribute("aria-valuenow", "-70");
   const before = simulation.commands.length;
   await arc.press("End");
   await expect.poll(() => simulation.commands.length).toBe(before + 1);
   await page.getByRole("button", { name: "Settings", exact: true }).first().click();
-  await expect(page.getByRole("button", { name: "Find devices", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Find devices", exact: true })).toBeDisabled();
   expect(simulation.commands).toHaveLength(before + 1);
   await page.getByRole("button", { name: "Home", exact: true }).first().click();
   arc = card(page, "Standing fan").getByRole("slider", { name: "Fan direction", exact: true });
-  await expect(arc).toHaveAttribute("aria-valuetext", "Not calibrated");
+  await expect(arc).toHaveAttribute("aria-valuenow", "70");
+  await page.reload();
+  await expect(arc).toHaveAttribute("aria-valuenow", "70");
+});
+
+test("one tap migrates the old measurement and survives reload while calibrating", async ({
+  page,
+  simulation,
+}) => {
+  await page.goto("/jarvis");
+  await page.evaluate(() => localStorage.setItem("jarvis:fan-travel:v1:fixture-fan", "8"));
+  const fan = card(page, "Standing fan");
+  await fan.getByRole("switch", { name: "Oscillate" }).click();
+  await fan.getByRole("button", { name: "Calibrate direction" }).click();
+  await expect(fan.getByRole("status", { name: "Fan movement" })).toContainText("Calibrating");
+  expect(simulation.commands.at(-1)).toEqual({
+    type: "fanHome",
+    id: "fixture-fan",
+    travelSteps: 8,
+  });
+  await page.reload();
+  await expect(fan.getByRole("status", { name: "Fan movement" })).toContainText("Calibrating");
+  await expect(fan.getByRole("slider", { name: "Fan direction", exact: true })).toHaveAttribute(
+    "aria-valuenow",
+    "-70",
+    { timeout: 10000 },
+  );
+  expect(simulation.commands.filter((op) => op.type === "fanHome")).toHaveLength(1);
+  expect(simulation.commands.filter((op) => op.action === "direction")).toHaveLength(0);
 });

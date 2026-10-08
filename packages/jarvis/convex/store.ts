@@ -2,6 +2,13 @@ import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { deviceState, sceneFields } from "./schema";
 import { requireGateway } from "./security";
+import {
+  deleteDirection,
+  directionChanged,
+  directionFor,
+  invalidateDirection,
+  publicDirection,
+} from "./fanDirectionStore";
 
 export const snapshot = query({
   args: { secret: v.string() },
@@ -19,34 +26,37 @@ export const snapshot = query({
     return {
       connected: !!account,
       region: account?.region ?? "sg",
-      devices: devices.map(
-        ({
-          _id,
-          name,
-          room,
-          kind,
-          provider,
-          model,
-          online,
-          capabilities,
-          state,
-          updatedAt,
-          error,
-          hidden,
-        }) => ({
-          id: _id,
-          hidden: hidden ?? false,
-          name,
-          room,
-          kind,
-          provider,
-          model,
-          online,
-          capabilities,
-          state,
-          updatedAt,
-          ...(error ? { error } : {}),
-        }),
+      devices: await Promise.all(
+        devices.map(
+          async ({
+            _id,
+            name,
+            room,
+            kind,
+            provider,
+            model,
+            online,
+            capabilities,
+            state,
+            updatedAt,
+            error,
+            hidden,
+          }) => ({
+            id: _id,
+            hidden: hidden ?? false,
+            name,
+            room,
+            kind,
+            provider,
+            model,
+            online,
+            capabilities,
+            state,
+            updatedAt,
+            ...(kind === "fan" ? { direction: publicDirection(await directionFor(ctx, _id)) } : {}),
+            ...(error ? { error } : {}),
+          }),
+        ),
       ),
       scenes: scenes.map(({ _id, _creationTime, ...scene }) => ({
         id: _id,
@@ -97,7 +107,10 @@ export const connect = internalMutation({
       .unique();
     if (previous) await ctx.db.delete(previous._id);
     // A new account must not inherit devices from an earlier account.
-    for (const row of await ctx.db.query("devices").collect()) await ctx.db.delete(row._id);
+    for (const row of await ctx.db.query("devices").collect()) {
+      await deleteDirection(ctx, row._id);
+      await ctx.db.delete(row._id);
+    }
     await ctx.db.insert("integrations", {
       provider: "xiaomi",
       encryptedSession: args.encryptedSession,
@@ -111,7 +124,11 @@ export const disconnect = internalMutation({
   args: {},
   handler: async (ctx) => {
     for (const table of ["integrations", "logins", "devices"] as const)
-      for (const row of await ctx.db.query(table).collect()) await ctx.db.delete(row._id);
+      for (const row of await ctx.db.query(table).collect()) {
+        if (table === "devices")
+          await deleteDirection(ctx, ctx.db.normalizeId("devices", row._id)!);
+        await ctx.db.delete(row._id);
+      }
   },
 });
 export const device = internalQuery({
@@ -135,7 +152,10 @@ export const syncDevices = internalMutation({
       throw new ConvexError("Account changed. Refresh the dashboard.");
     const previous = await ctx.db.query("devices").collect();
     for (const row of previous)
-      if (!devices.some((d) => d.externalId === row.externalId)) await ctx.db.delete(row._id);
+      if (!devices.some((d) => d.externalId === row.externalId)) {
+        await deleteDirection(ctx, row._id);
+        await ctx.db.delete(row._id);
+      }
     for (const device of devices) {
       const old = previous.find((d) => d.externalId === device.externalId);
       if (old)
@@ -189,12 +209,24 @@ export const updateState = internalMutation({
     error: v.optional(v.string()),
   },
   handler: async (ctx, { id, ...data }) => {
-    if (await ctx.db.get(id))
+    const previous = await ctx.db.get(id);
+    if (previous) {
+      if (previous.kind === "fan" && directionChanged(previous.state, data.state, data.online))
+        await invalidateDirection(ctx, id);
       await ctx.db.patch(id, {
         ...data,
         error: data.error,
         updatedAt: Date.now(),
       });
+    }
+  },
+});
+export const invalidateFanDirection = internalMutation({
+  args: { id: v.id("devices") },
+  returns: v.null(),
+  handler: async (ctx, { id }) => {
+    await invalidateDirection(ctx, id);
+    return null;
   },
 });
 export const visibility = internalMutation({

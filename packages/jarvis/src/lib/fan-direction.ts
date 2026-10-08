@@ -1,4 +1,5 @@
-export const MAX_TRAVEL_STEPS = 70;
+import { FAN_SETTLE_MS, MAX_TRAVEL_STEPS } from "../../fan-direction";
+export { MAX_TRAVEL_STEPS, validTravelSteps } from "../../fan-direction";
 
 export type FanMove = {
   direction: "left" | "right";
@@ -21,7 +22,7 @@ export function stepToAngle(step: number, total: number) {
 export async function runFanMovement(
   move: FanMove,
   send: () => Promise<void>,
-  pause: () => Promise<void> = () => new Promise((resolve) => setTimeout(resolve, 1500)),
+  pause: () => Promise<void> = () => new Promise((resolve) => setTimeout(resolve, FAN_SETTLE_MS)),
 ) {
   if (!Number.isInteger(move.count) || move.count < 1 || move.count > MAX_TRAVEL_STEPS)
     throw new Error("Invalid fan movement count.");

@@ -68,8 +68,6 @@ test("offline and unverified devices retain honest state and disabled controls",
 test("empty dashboard offers discovery and connection management", async ({ page, simulation }) => {
   simulation.state.devices = [];
   await page.goto("/jarvis");
-  await card(page, "Standing fan").getByText("More controls", { exact: true }).click();
-  await card(page, "Standing fan").getByRole("button", { name: "Refresh", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Bring your devices together" })).toBeVisible();
   await page.getByRole("button", { name: "Find my devices" }).click();
   await expect.poll(() => simulation.commands.at(-1)).toMatchObject({ type: "discover" });

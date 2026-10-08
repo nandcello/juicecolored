@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, MoveHorizontal } from "lucide-react";
 import type { FanDevice } from "../lib/domain";
 import type { MoveFan } from "../lib/fan-direction";
-import { FanDirection } from "./fan-direction";
+import { FanDirection, type FanDirectionActions } from "./fan-direction";
 import { DeviceCard, Range, Switch, type Command } from "./device-controls";
 import c from "./dashboard.module.css";
 
@@ -15,6 +15,7 @@ export function FanControls({
   onSettings,
   onRefresh,
   onMove,
+  directionActions,
 }: {
   device: FanDevice;
   busy: boolean;
@@ -22,6 +23,7 @@ export function FanControls({
   onSettings: () => void;
   onRefresh: () => void;
   onMove: MoveFan;
+  directionActions: FanDirectionActions;
 }) {
   const state = device.state;
   const [minutes, setMinutes] = useState(String(state.offInMinutes || 60));
@@ -189,6 +191,8 @@ export function FanControls({
         <FanDirection
           key={`${directionVersion}:${state.power}:${state.oscillating}:${state.childLock}:${device.online}`}
           deviceId={device.id}
+          direction={device.direction}
+          actions={directionActions}
           disabled={stopped || state.oscillating || state.childLock}
           unavailable={
             state.oscillating
