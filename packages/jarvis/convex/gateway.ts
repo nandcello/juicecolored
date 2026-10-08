@@ -37,6 +37,20 @@ const controlData = v.object({
   ),
 });
 const operation = v.union(
+  v.object({ type: v.literal("fanSetup"), id: v.id("devices") }),
+  v.object({
+    type: v.literal("fanCheckEnd"),
+    id: v.id("devices"),
+    token: v.string(),
+    round: v.number(),
+  }),
+  v.object({
+    type: v.literal("fanObserveEnd"),
+    id: v.id("devices"),
+    token: v.string(),
+    round: v.number(),
+    moved: v.boolean(),
+  }),
   v.object({
     type: v.literal("fanHome"),
     id: v.id("devices"),
@@ -158,12 +172,23 @@ export const execute = action({
       await ctx.runMutation(internal.fanMotion.stop, { deviceId: op.id, token: op.token });
       return { ok: true };
     }
+    if (op.type === "fanCheckEnd" || op.type === "fanObserveEnd") {
+      const args = { deviceId: op.id, token: op.token, round: op.round };
+      if (op.type === "fanCheckEnd") await ctx.runMutation(internal.fanCalibration.checkEnd, args);
+      else await ctx.runMutation(internal.fanCalibration.observeEnd, { ...args, moved: op.moved });
+      return { ok: true };
+    }
     const token = randomUUID(),
       key = "xiaomi-owner";
     if (!(await ctx.runMutation(internal.store.acquire, { key, token })))
       throw new ConvexError("Another request is in progress. Try again in a moment.");
     let backgroundOwnsLease = false;
     try {
+      if (op.type === "fanSetup") {
+        await ctx.runMutation(internal.fanCalibration.start, { deviceId: op.id, token });
+        backgroundOwnsLease = true;
+        return { ok: true };
+      }
       if (op.type === "fanReference") {
         await ctx.runMutation(internal.fanMotion.reference, {
           deviceId: op.id,

@@ -297,3 +297,171 @@ describe("background fan calibration", () => {
     expect(await s.t.run((ctx) => ctx.db.query("fanDirections").take(1))).toEqual([]);
   });
 });
+
+async function automaticSetup() {
+  const s = await setup();
+  const row = () =>
+    s.t.run((ctx) =>
+      ctx.db
+        .query("fanDirections")
+        .withIndex("by_deviceId", (q) => q.eq("deviceId", s.id))
+        .unique(),
+    );
+  async function until(
+    predicate: (value: NonNullable<Awaited<ReturnType<typeof row>>>) => boolean,
+  ) {
+    for (let i = 0; i < 2500; i++) {
+      const value = await row();
+      if (value && predicate(value)) return value;
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    throw new Error("Calibration did not reach the expected state.");
+  }
+  async function check() {
+    const value = (await row())!;
+    await s.t.action(api.gateway.execute, {
+      secret,
+      operation: {
+        type: "fanCheckEnd",
+        id: s.id,
+        token: value.motion!.token,
+        round: value.setup!.round,
+      },
+    });
+    return until((v) => v.setup?.stage === "confirm");
+  }
+  async function observe(moved: boolean) {
+    const value = (await row())!;
+    await s.t.action(api.gateway.execute, {
+      secret,
+      operation: {
+        type: "fanObserveEnd",
+        id: s.id,
+        token: value.motion!.token,
+        round: value.setup!.round,
+        moved,
+      },
+    });
+  }
+  await s.t.action(api.gateway.execute, { secret, operation: { type: "fanSetup", id: s.id } });
+  return { ...s, row, until, check, observe };
+}
+
+describe("automatic first-time fan setup", () => {
+  it("moves without per-step clicks, checks both ends, and excludes known no-movement attempts", async () => {
+    const s = await automaticSetup();
+    expect((await s.direction()).travelSteps).toBe(0);
+    await s.until((r) => (r.setup?.attempts ?? 0) >= 2);
+    const left = await s.check();
+    expect(left.setup?.side).toBe("left");
+    expect(left.position).toBeNull();
+    const waitingWrites = s.control.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(s.control).toHaveBeenCalledTimes(waitingWrites);
+    await s.observe(false);
+    await s.until((r) => r.setup?.side === "right" && r.setup.attempts >= 5);
+    const right = await s.check();
+    const attempts = right.setup!.attempts;
+    expect(right.motion?.direction).toBe("right");
+    await s.observe(false);
+    const result = (await s.row())!;
+    expect(result.setup).toBeUndefined();
+    expect(result.motion).toBeUndefined();
+    expect(result.travelSteps).toBe(attempts - 1);
+    expect(result.homingSteps).toBe(attempts);
+    expect(result.position).toBe(attempts - 1);
+    expect(result.measurement).toBe("observed");
+    expect((await s.snapshot()).activity[0].status).toBe("success");
+    // Automatic re-homing uses the conservative command count, not the smaller
+    // estimated travel distance, and retains the verified slower cadence.
+    await s.home();
+    expect((await s.direction()).motion?.steps).toBe(attempts);
+    await s.drain();
+  });
+
+  it("pauses before probes, spaces them six seconds apart, and slows down after a false end", async () => {
+    const s = await automaticSetup();
+    const sends: number[] = [];
+    s.control.mockImplementation(async () => {
+      sends.push(Date.now());
+    });
+    await s.until((r) => (r.setup?.attempts ?? 0) >= 2);
+    const beforeCheck = Date.now();
+    const checked = await s.check();
+    const probes = sends.slice(-2);
+    expect(probes[0] - beforeCheck).toBeGreaterThanOrEqual(6000);
+    expect(probes[1] - probes[0]).toBeGreaterThanOrEqual(6000);
+    expect(checked.travelSteps).toBe(0);
+    const oldRound = checked.setup!.round;
+    const token = checked.motion!.token;
+    await s.observe(true);
+    expect((await s.row())!.setup).toMatchObject({
+      side: "left",
+      stage: "sweeping",
+      settleMs: 5000,
+      round: oldRound + 1,
+    });
+    // A delayed duplicate observation must not advance the next phase.
+    await s.t.action(api.gateway.execute, {
+      secret,
+      operation: { type: "fanObserveEnd", id: s.id, token, round: oldRound, moved: false },
+    });
+    expect((await s.row())!.setup?.side).toBe("left");
+    const count = sends.length;
+    await s.until(() => sends.length >= count + 2);
+    expect(sends.at(-1)! - sends.at(-2)!).toBeGreaterThanOrEqual(5000);
+    await s.t.action(api.gateway.execute, {
+      secret,
+      operation: { type: "fanStop", id: s.id, token },
+    });
+    await s.drain();
+  });
+
+  it("does not mistake accepted commands or a movement cap for a detected endpoint", async () => {
+    const s = await automaticSetup();
+    // All acknowledgements succeed, regardless of actual head movement. Without
+    // an observation the bounded sweep must fail, never save a measurement.
+    await s.until((r) => !r.motion);
+    expect((await s.row())!.position).toBeNull();
+    expect((await s.row())!.travelSteps).toBe(0);
+    expect((await s.row())!.error).toContain("movement limit");
+    expect(s.control).toHaveBeenCalledTimes(70);
+    await s.drain();
+  });
+
+  it("ignores premature/stale observations and expires an abandoned endpoint question", async () => {
+    const s = await automaticSetup();
+    const initial = (await s.row())!;
+    for (const token of ["stale", initial.motion!.token]) {
+      await s.t.action(api.gateway.execute, {
+        secret,
+        operation: { type: "fanObserveEnd", id: s.id, token, round: 0, moved: false },
+      });
+    }
+    expect((await s.row())!.setup?.side).toBe("left");
+    await s.until((r) => (r.setup?.attempts ?? 0) >= 1);
+    await s.check();
+    await vi.advanceTimersByTimeAsync(120001);
+    await s.drain();
+    expect((await s.row())!.motion).toBeUndefined();
+    expect((await s.row())!.setup).toBeUndefined();
+    expect((await s.row())!.position).toBeNull();
+    expect((await s.row())!.travelSteps).toBe(0);
+  });
+
+  it("does not retry failed physical commands during first setup", async () => {
+    const s = await automaticSetup();
+    s.control.mockRejectedValueOnce(new Error("ambiguous delivery"));
+    await s.drain();
+    expect(s.control).toHaveBeenCalledTimes(1);
+    expect((await s.direction()).setup).toBeUndefined();
+    expect((await s.direction()).position).toBeNull();
+    expect((await s.direction()).error).toContain("not be confirmed");
+    // An abandoned first setup leaves a provisional zero count. It must not
+    // prevent a different browser from importing its older valid measurement.
+    await s.home(4);
+    await s.drain();
+    expect((await s.direction()).travelSteps).toBe(4);
+    expect((await s.direction()).position).toBe(0);
+  });
+});

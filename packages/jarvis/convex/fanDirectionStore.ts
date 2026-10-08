@@ -13,10 +13,12 @@ export function directionFor(ctx: QueryCtx, deviceId: Id<"devices">) {
 
 export function publicDirection(row: Doc<"fanDirections"> | null): FanDirectionState | undefined {
   if (!row) return undefined;
-  const { travelSteps, position, error, motion } = row;
+  const { travelSteps, position, error, motion, setup, measurement } = row;
   return {
     travelSteps,
     position,
+    ...(measurement ? { measurement } : {}),
+    ...(setup ? { setup: { side: setup.side, stage: setup.stage, round: setup.round } } : {}),
     ...(error ? { error } : {}),
     ...(motion
       ? {

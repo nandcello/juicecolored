@@ -6,7 +6,6 @@ import { internal } from "./_generated/api";
 import { createClient } from "./adapters/yeelight";
 import { controlFan, readFan } from "./adapters/fan";
 import { unseal } from "./crypto";
-import { FAN_SETTLE_MS } from "../fan-direction";
 import type { FanState } from "../domain";
 
 export const step = internalAction({
@@ -41,16 +40,16 @@ export const step = internalAction({
       };
       // Read before starting, periodically during travel, and after the final step.
       // Re-reading all properties after every nudge adds latency but no heading feedback.
-      if (args.step % 5 === 0) await checkState();
+      if (claimed.checkBefore) await checkState();
       if (!(await ctx.runQuery(internal.fanMotion.maySend, args))) {
         await ctx.runMutation(internal.fanMotion.completeStep, {
           ...args,
-          error: "Movement stopped. Calibrate again before aiming.",
+          sent: false,
         });
         return null;
       }
       await controlFan(client, claimed.externalId, "direction", { direction: claimed.direction });
-      await new Promise((resolve) => setTimeout(resolve, FAN_SETTLE_MS));
+      await new Promise((resolve) => setTimeout(resolve, claimed.settleMs));
       if (claimed.last) await checkState();
       await ctx.runMutation(internal.fanMotion.completeStep, args);
     } catch {

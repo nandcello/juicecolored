@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, MoveHorizontal } from "lucide-react";
 import type { FanDevice } from "../lib/domain";
-import type { MoveFan } from "../lib/fan-direction";
 import { FanDirection, type FanDirectionActions } from "./fan-direction";
 import { DeviceCard, Range, Switch, type Command } from "./device-controls";
 import c from "./dashboard.module.css";
@@ -14,7 +13,6 @@ export function FanControls({
   onCommand,
   onSettings,
   onRefresh,
-  onMove,
   directionActions,
 }: {
   device: FanDevice;
@@ -22,7 +20,6 @@ export function FanControls({
   onCommand: Command;
   onSettings: () => void;
   onRefresh: () => void;
-  onMove: MoveFan;
   directionActions: FanDirectionActions;
 }) {
   const state = device.state;
@@ -201,7 +198,6 @@ export function FanControls({
                 ? "Turn off child lock to aim the fan."
                 : undefined
           }
-          onMove={onMove}
         />
       )}
     </DeviceCard>

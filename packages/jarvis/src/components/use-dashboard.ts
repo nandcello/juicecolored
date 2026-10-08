@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { LightDevice, Scene, Snapshot } from "../lib/domain";
 import { request } from "../lib/client";
-import { runFanMovement, type FanMove } from "../lib/fan-direction";
 
 export type View = "devices" | "scenes" | "activity" | "settings";
 export type Dialog = "connect" | "save" | "device" | "disconnect" | "help" | null;
@@ -109,7 +108,11 @@ export function useDashboard(initial: Snapshot) {
     message?: string,
     perform = () => request(operation),
   ) {
-    if (working.current || (backgroundMoving && operation.type !== "fanStop")) {
+    if (
+      working.current ||
+      (backgroundMoving &&
+        !["fanStop", "fanCheckEnd", "fanObserveEnd"].includes(String(operation.type)))
+    ) {
       setNotice({
         text: "A request is in progress. Give it a moment, then try again.",
         error: false,
@@ -159,44 +162,6 @@ export function useDashboard(initial: Snapshot) {
   }
   async function fanTask(operation: Record<string, unknown>) {
     const result = await task(operation);
-    return result?.ok === true;
-  }
-  async function moveFan(id: string, move: FanMove) {
-    const operation = {
-      type: "control",
-      id,
-      action: "direction",
-      data: { direction: move.direction },
-    };
-    const result = await task(operation, undefined, async () => {
-      // Keep the dashboard's operation lock for the entire sequence, including
-      // motor settling time. The server still validates and leases each nudge.
-      const checkReady = (snapshot: Snapshot) => {
-        const fan = snapshot.devices.find((d) => d.id === id);
-        if (
-          fan?.kind !== "fan" ||
-          !fan.online ||
-          !fan.updatedAt ||
-          !fan.state.power ||
-          fan.state.oscillating ||
-          fan.state.childLock
-        )
-          throw new Error(
-            "Fan direction is unavailable. Turn off oscillation and child lock, then recalibrate.",
-          );
-      };
-      checkReady(await request<Snapshot>());
-      const completed = await runFanMovement(move, async () => {
-        if (document.hidden)
-          throw new Error("Fan movement stopped. Recalibrate before aiming again.");
-        const response = await request(operation);
-        if (response.warning) throw new Error(String(response.warning));
-        const next = await request<Snapshot>();
-        checkReady(next);
-        if (alive.current) setState(next);
-      });
-      return { ok: completed };
-    });
     return result?.ok === true;
   }
   function openDevice(id: string, nextDialog: "device" | "save") {
@@ -273,7 +238,6 @@ export function useDashboard(initial: Snapshot) {
     setRegion,
     task,
     command,
-    moveFan,
     fanTask,
     openDevice,
     closeDialog,

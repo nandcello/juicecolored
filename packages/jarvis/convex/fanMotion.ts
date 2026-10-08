@@ -1,40 +1,15 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Doc } from "./_generated/dataModel";
-import { FAN_LEASE_MS, validTravelSteps } from "../fan-direction";
+import { FAN_END_CHECK_MS, FAN_LEASE_MS, FAN_SETTLE_MS, validTravelSteps } from "../fan-direction";
 import { directionFor, requireReadyFan } from "./fanDirectionStore";
+import { finish, leaseFor } from "./fanMotionState";
+import { completeCalibrationStep } from "./fanCalibration";
 
 const identity = { deviceId: v.id("devices"), token: v.string() };
 const stepIdentity = { ...identity, step: v.number() };
 const stopped = "Movement stopped. Calibrate again before aiming.";
 const expired = "Movement could not be confirmed. Calibrate again before aiming.";
-
-async function leaseFor(ctx: MutationCtx) {
-  return ctx.db
-    .query("leases")
-    .withIndex("by_key", (q) => q.eq("key", "xiaomi-owner"))
-    .unique();
-}
-
-async function finish(ctx: MutationCtx, row: Doc<"fanDirections">, error?: string) {
-  const motion = row.motion;
-  if (!motion) return;
-  await ctx.db.patch(row._id, { motion: undefined, position: error ? null : motion.target, error });
-  const lease = await leaseFor(ctx);
-  if (lease?.token === motion.token) await ctx.db.delete(lease._id);
-  const device = await ctx.db.get(row.deviceId);
-  if (device) {
-    await ctx.db.insert("activity", {
-      deviceName: device.name,
-      label: error ?? (motion.kind === "home" ? "Fan direction calibrated" : "Fan aimed"),
-      status: error ? "error" : "success",
-      createdAt: Date.now(),
-    });
-    for (const event of (await ctx.db.query("activity").order("desc").take(101)).slice(100))
-      await ctx.db.delete(event._id);
-  }
-}
 
 export const reference = internalMutation({
   args: { deviceId: v.id("devices"), travelSteps: v.number(), position: v.number() },
@@ -45,7 +20,14 @@ export const reference = internalMutation({
       throw new ConvexError("Invalid fan travel measurement.");
     const row = await directionFor(ctx, deviceId);
     if (row?.motion) throw new ConvexError("Wait for the fan to stop first.");
-    const data = { deviceId, travelSteps, position, error: undefined };
+    const data = {
+      deviceId,
+      travelSteps,
+      position,
+      error: undefined,
+      homingSteps: undefined,
+      measurement: undefined,
+    };
     if (row) await ctx.db.patch(row._id, data);
     else await ctx.db.insert("fanDirections", data);
     return null;
@@ -64,7 +46,7 @@ export const start = internalMutation({
     requireReadyFan(await ctx.db.get(deviceId));
     const row = await directionFor(ctx, deviceId);
     if (row?.motion) throw new ConvexError("Wait for the fan to stop first.");
-    const travelSteps = row?.travelSteps ?? saved ?? 0;
+    const travelSteps = validTravelSteps(row?.travelSteps ?? 0) ? row!.travelSteps : (saved ?? 0);
     if (!validTravelSteps(travelSteps))
       throw new ConvexError("Measure the fan travel once before using auto-calibration.");
     const target = kind === "home" ? 0 : requested;
@@ -73,7 +55,8 @@ export const start = internalMutation({
     if (kind === "aim" && row?.position == null)
       throw new ConvexError("Calibrate the fan before aiming.");
     const startPosition = row?.position ?? 0;
-    const steps = kind === "home" ? travelSteps : Math.abs(target - startPosition);
+    const steps =
+      kind === "home" ? (row?.homingSteps ?? travelSteps) : Math.abs(target - startPosition);
     if (!steps) return false;
     const lease = await leaseFor(ctx);
     if (lease?.token !== token || lease.expires <= Date.now())
@@ -109,6 +92,8 @@ export const claim = internalMutation({
       encryptedSession: v.string(),
       direction: v.union(v.literal("left"), v.literal("right")),
       last: v.boolean(),
+      settleMs: v.number(),
+      checkBefore: v.boolean(),
     }),
   ),
   handler: async (ctx, { deviceId, token, step }) => {
@@ -116,6 +101,7 @@ export const claim = internalMutation({
       motion = row?.motion;
     if (!row || !motion || motion.token !== token || motion.completed !== step || motion.inFlight)
       return null;
+    if (row.setup?.stage === "confirm" || (motion.notBefore ?? 0) > Date.now()) return null;
     const lease = await leaseFor(ctx);
     if (
       motion.stopping ||
@@ -143,6 +129,14 @@ export const claim = internalMutation({
       encryptedSession: account.encryptedSession,
       direction: motion.direction,
       last: step + 1 === motion.steps,
+      settleMs:
+        motion.kind === "probe"
+          ? FAN_END_CHECK_MS
+          : Math.max(row.setup?.settleMs ?? row.settleMs ?? 0, FAN_SETTLE_MS),
+      checkBefore:
+        step % 5 === 0 ||
+        motion.kind === "probe" ||
+        (motion.kind === "seek" && row.setup?.attempts === 0),
     };
   },
 });
@@ -164,6 +158,8 @@ export const maySend = internalQuery({
       motion.completed === step &&
       motion.inFlight &&
       !motion.stopping &&
+      !(motion.kind === "seek" && row?.setup?.stage === "checking") &&
+      (motion.notBefore ?? 0) <= Date.now() &&
       motion.expiresAt > Date.now() &&
       lease?.token === token &&
       lease.expires > Date.now()
@@ -172,9 +168,9 @@ export const maySend = internalQuery({
 });
 
 export const completeStep = internalMutation({
-  args: { ...stepIdentity, error: v.optional(v.string()) },
+  args: { ...stepIdentity, error: v.optional(v.string()), sent: v.optional(v.boolean()) },
   returns: v.null(),
-  handler: async (ctx, { deviceId, token, step, error }) => {
+  handler: async (ctx, { deviceId, token, step, error, sent = true }) => {
     const row = await directionFor(ctx, deviceId),
       motion = row?.motion;
     if (!row || !motion || motion.token !== token || motion.completed !== step) return null;
@@ -187,7 +183,9 @@ export const completeStep = internalMutation({
       lease.expires <= Date.now()
     ) {
       await finish(ctx, row, error ?? (motion.stopping ? stopped : expired));
-    } else if (motion.inFlight) {
+    } else if (motion.inFlight && row.setup) {
+      await completeCalibrationStep(ctx, row, sent);
+    } else if (motion.inFlight && sent) {
       const completed = step + 1;
       if (completed === motion.steps) await finish(ctx, row);
       else {

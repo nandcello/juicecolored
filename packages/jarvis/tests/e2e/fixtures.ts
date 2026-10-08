@@ -14,6 +14,8 @@ export type Operation = {
   travelSteps?: number;
   position?: number;
   token?: string;
+  round?: number;
+  moved?: boolean;
 };
 export type Simulation = {
   state: Snapshot;
@@ -22,6 +24,8 @@ export type Simulation = {
   delay: number;
   loginPending: boolean;
   motionError: boolean;
+  setupAttempts: number;
+  setupDelay: number;
 };
 export const test = base.extend<{ simulation: Simulation }>({
   simulation: async ({ page }, provide) => {
@@ -32,8 +36,28 @@ export const test = base.extend<{ simulation: Simulation }>({
       delay: 0,
       loginPending: true,
       motionError: false,
+      setupAttempts: 0,
+      setupDelay: 300,
     };
     const motionTimers: ReturnType<typeof setInterval>[] = [];
+    function sweepSetup(device: Extract<Snapshot["devices"][number], { kind: "fan" }>) {
+      const state = device.direction!;
+      const round = state.setup!.round;
+      const timer = setInterval(() => {
+        if (
+          device.direction !== state ||
+          !state.motion ||
+          state.setup?.stage !== "sweeping" ||
+          state.setup.round !== round
+        ) {
+          clearInterval(timer);
+          return;
+        }
+        state.motion.completed++;
+        simulation.setupAttempts++;
+      }, simulation.setupDelay);
+      motionTimers.push(timer);
+    }
     await page.route("**/api/jarvis", async (route) => {
       if (route.request().method() === "GET") return route.fulfill({ json: simulation.state });
       const op: Operation = route.request().postDataJSON();
@@ -64,6 +88,71 @@ export const test = base.extend<{ simulation: Simulation }>({
       }
       const device = simulation.state.devices.find((d) => d.id === op.id);
       if (device?.kind === "fan") {
+        if (op.type === "fanSetup") {
+          simulation.setupAttempts = 0;
+          device.direction = {
+            travelSteps: device.direction?.travelSteps ?? 0,
+            position: null,
+            setup: { side: "left", stage: "sweeping", round: 0 },
+            motion: {
+              token: `setup-${simulation.commands.length}`,
+              kind: "seek",
+              steps: 70,
+              completed: 0,
+              stopping: false,
+            },
+          };
+          sweepSetup(device);
+        }
+        const setupState = device.direction;
+        if (
+          op.type === "fanCheckEnd" &&
+          setupState?.setup?.stage === "sweeping" &&
+          setupState.motion &&
+          setupState.motion.token === op.token &&
+          setupState.setup.round === op.round
+        ) {
+          setupState.setup.stage = "checking";
+          setupState.motion.kind = "probe";
+          setupState.motion.steps = setupState.motion.completed + 2;
+          const timer = setInterval(() => {
+            if (
+              device.direction !== setupState ||
+              !setupState.motion ||
+              setupState.setup?.stage !== "checking"
+            ) {
+              clearInterval(timer);
+              return;
+            }
+            setupState.motion.completed++;
+            if (setupState.motion.completed === setupState.motion.steps) {
+              setupState.setup.stage = "confirm";
+              clearInterval(timer);
+            }
+          }, 400);
+          motionTimers.push(timer);
+        }
+        if (
+          op.type === "fanObserveEnd" &&
+          setupState?.setup?.stage === "confirm" &&
+          setupState.motion &&
+          setupState.motion.token === op.token &&
+          setupState.setup.round === op.round
+        ) {
+          if (!op.moved && setupState.setup.side === "right") {
+            const travelSteps = simulation.setupAttempts - 1;
+            device.direction = { travelSteps, position: travelSteps, measurement: "observed" };
+          } else {
+            if (!op.moved) {
+              setupState.setup.side = "right";
+              simulation.setupAttempts = 0;
+            }
+            setupState.setup.round++;
+            setupState.setup.stage = "sweeping";
+            setupState.motion.kind = "seek";
+            sweepSetup(device);
+          }
+        }
         if (op.type === "fanReference")
           device.direction = { travelSteps: op.travelSteps!, position: op.position! };
         if (op.type === "fanHome" || op.type === "fanAim") {
@@ -108,6 +197,7 @@ export const test = base.extend<{ simulation: Simulation }>({
           device.direction.motion.token === op.token
         ) {
           device.direction.motion = undefined;
+          device.direction.setup = undefined;
           device.direction.position = null;
           device.direction.error = "Movement stopped. Calibrate again before aiming.";
         }

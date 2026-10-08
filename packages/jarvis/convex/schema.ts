@@ -31,7 +31,7 @@ export const sceneFields = {
 };
 export const fanMotion = v.object({
   token: v.string(),
-  kind: v.union(v.literal("home"), v.literal("aim")),
+  kind: v.union(v.literal("home"), v.literal("aim"), v.literal("seek"), v.literal("probe")),
   direction: v.union(v.literal("left"), v.literal("right")),
   target: v.number(),
   steps: v.number(),
@@ -39,6 +39,14 @@ export const fanMotion = v.object({
   inFlight: v.boolean(),
   stopping: v.boolean(),
   expiresAt: v.number(),
+  notBefore: v.optional(v.number()),
+});
+export const fanSetup = v.object({
+  side: v.union(v.literal("left"), v.literal("right")),
+  stage: v.union(v.literal("sweeping"), v.literal("checking"), v.literal("confirm")),
+  round: v.number(),
+  attempts: v.number(),
+  settleMs: v.number(),
 });
 export default defineSchema({
   fanDirections: defineTable({
@@ -47,6 +55,10 @@ export default defineSchema({
     position: v.union(v.number(), v.null()),
     motion: v.optional(fanMotion),
     error: v.optional(v.string()),
+    setup: v.optional(fanSetup),
+    homingSteps: v.optional(v.number()),
+    settleMs: v.optional(v.number()),
+    measurement: v.optional(v.literal("observed")),
   }).index("by_deviceId", ["deviceId"]),
   integrations: defineTable({
     provider: v.literal("xiaomi"),

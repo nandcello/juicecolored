@@ -176,7 +176,6 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
                                 key={d.id}
                                 device={d}
                                 {...shared}
-                                onMove={(move) => controller.moveFan(d.id, move)}
                                 directionActions={{
                                   home: (travelSteps) =>
                                     controller.fanTask({
@@ -186,12 +185,21 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
                                     }),
                                   aim: (position) =>
                                     controller.fanTask({ type: "fanAim", id: d.id, position }),
-                                  reference: (travelSteps, position) =>
+                                  setup: () => controller.fanTask({ type: "fanSetup", id: d.id }),
+                                  checkEnd: (token, round) =>
                                     controller.fanTask({
-                                      type: "fanReference",
+                                      type: "fanCheckEnd",
                                       id: d.id,
-                                      travelSteps,
-                                      position,
+                                      token,
+                                      round,
+                                    }),
+                                  observeEnd: (token, round, moved) =>
+                                    controller.fanTask({
+                                      type: "fanObserveEnd",
+                                      id: d.id,
+                                      token,
+                                      round,
+                                      moved,
                                     }),
                                   stop: (token) =>
                                     controller.fanTask({ type: "fanStop", id: d.id, token }),
