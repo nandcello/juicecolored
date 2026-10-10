@@ -1,0 +1,31 @@
+.root {
+  min-height: 100dvh;
+}
+
+.indicator {
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 50%;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border: 1px solid #dfe3de;
+  border-radius: 28px;
+  background: #ffffff;
+  color: #315d47;
+  box-shadow: 0 3px 12px #2328221a;
+  font-size: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.indicator[data-visible="true"] {
+  opacity: 1;
+}
+
+.ready {
+  transform: rotate(180deg);
+}

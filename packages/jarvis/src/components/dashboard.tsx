@@ -45,7 +45,7 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
     window.scrollTo({ top: 0 });
   }
   return (
-    <div className={c.app}>
+    <div className={c.app} aria-busy={busy}>
       <a href="#main" className={c.skip}>
         Skip to controls
       </a>
