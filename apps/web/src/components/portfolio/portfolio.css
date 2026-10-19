@@ -376,7 +376,8 @@
   #contents h2 em {
     color: var(--orange);
   }
-  #contents-list button {
+  #contents-list button,
+  #contents-list .learn-contents-link {
     display: flex;
     width: 100%;
     justify-content: space-between;
@@ -385,10 +386,12 @@
     padding: 17px 0;
     font-size: 18px;
   }
-  #contents-list button:hover {
+  #contents-list button:hover,
+  #contents-list .learn-contents-link:hover {
     color: var(--orange);
   }
-  #contents-list button span {
+  #contents-list button span,
+  #contents-list .learn-contents-link span {
     font-size: 12px;
   }
   .turn-in {

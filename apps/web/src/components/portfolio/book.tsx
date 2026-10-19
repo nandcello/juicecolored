@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment } from "react";
+import Link from "next/link";
 import {
   Cover,
   Introduction,
@@ -81,6 +82,9 @@ export function PortfolioBook({ pleasures }: { pleasures: ReactNode }) {
               <span>{String(index + 1).padStart(2, "0")}</span>
             </button>
           ))}
+          <Link href="/learn" className="learn-contents-link">
+            Learn <span>FIELD GUIDES ↗</span>
+          </Link>
         </div>
       </nav>
       <main ref={bookRef} id="book" tabIndex={-1} aria-label="Portfolio book" inert={contentsOpen}>

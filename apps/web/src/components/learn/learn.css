@@ -1,0 +1,170 @@
+@scope (.learn-page) {
+  :scope {
+    --ink: light-dark(#25251f, #dedfd7);
+    --paper: light-dark(#f1efe6, #191814);
+    --blue: light-dark(#263de8, #9aa6ff);
+    --orange: light-dark(#cf4118, #f07a52);
+    min-height: 100dvh;
+    color: var(--ink);
+    background: var(--paper);
+    font-family: "DM Sans", Arial, sans-serif;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  a:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 6px;
+  }
+  ::selection {
+    background: light-dark(#f8b79c, #5d2b15);
+    color: var(--ink);
+  }
+  .skip-link {
+    position: fixed;
+    top: -100px;
+    left: 20px;
+    z-index: 60;
+    padding: 12px;
+    background: var(--paper);
+  }
+  .skip-link:focus {
+    top: 12px;
+  }
+  header {
+    min-height: 78px;
+    display: flex;
+    gap: 24px;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 4.8%;
+    border-bottom: 1px solid light-dark(#25251f35, #dedfd735);
+  }
+  header a {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 13px;
+  }
+  .learn-header-actions {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+  }
+  header .learn-brand {
+    font-size: 23px;
+    font-weight: 700;
+    letter-spacing: -0.8px;
+    gap: 0;
+  }
+  .learn-brand span {
+    color: var(--orange);
+  }
+  main {
+    max-width: 1160px;
+    margin: auto;
+    padding: 72px 4.8% 100px;
+  }
+  h1 {
+    font:
+      400 clamp(52px, 7vw, 88px)/1.03 "Libre Caslon Display",
+      Georgia,
+      serif;
+    letter-spacing: -1px;
+  }
+  h1 em {
+    color: var(--orange);
+  }
+  .learn-intro {
+    max-width: 51ch;
+    margin-top: 28px;
+    font-size: 17px;
+    line-height: 1.75;
+  }
+  section {
+    margin-top: 76px;
+  }
+  h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 18px;
+  }
+  .guide-entry {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) 2fr;
+    gap: 40px;
+    border-block: 1px solid light-dark(#25251f35, #dedfd735);
+    padding-block: 32px;
+  }
+  .guide-entry:hover h3,
+  .guide-entry:hover .guide-entry-action {
+    color: var(--blue);
+  }
+  .guide-art {
+    background: light-dark(#e3eadb, #1d2118);
+    color: light-dark(#315a45, #a2ccb4);
+    padding: 32px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .guide-art svg {
+    flex-basis: 100%;
+  }
+  .guide-art span {
+    font-size: 12px;
+  }
+  h3 {
+    font:
+      400 40px/1.2 "Libre Caslon Display",
+      Georgia,
+      serif;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .guide-copy p {
+    margin: 16px 0 24px;
+    max-width: 60ch;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+  .guide-entry-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  footer {
+    border-top: 1px solid light-dark(#25251f35, #dedfd735);
+    padding: 24px 4.8%;
+    font-size: 12px;
+  }
+  @media (max-width: 600px) {
+    header {
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    main {
+      padding: 48px 6% 64px;
+    }
+    section {
+      margin-top: 48px;
+    }
+    .guide-entry {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    .guide-art {
+      padding: 24px;
+    }
+    h3 {
+      font-size: 34px;
+    }
+  }
+}

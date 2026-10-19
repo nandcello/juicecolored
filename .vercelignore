@@ -5,6 +5,10 @@
 **/node_modules
 **/.output
 **/.vercel
+**/.convex
+**/.impeccable
+**/test-results
+**/playwright-report
 **/.nitro
 **/.tanstack
 **/.wrangler

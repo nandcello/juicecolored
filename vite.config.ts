@@ -12,6 +12,7 @@ export default defineConfig({
       "packages/jarvis/convex/adapters/vendor/**",
       "**/.next/**",
       "**/next-env.d.ts",
+      "apps/web/public/learn/pstack/source/**",
     ],
   },
   lint: {

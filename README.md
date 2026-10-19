@@ -1,12 +1,13 @@
 # JuiceColored
 
-The portfolio, Jarvis and CANCELDT are served by **one Next.js application**, `apps/web`.
+The portfolio, learning guides, Jarvis and CANCELDT are served by **one Next.js application**, `apps/web`.
 
-| Public path      | Implementation      | Styling                             |
-| ---------------- | ------------------- | ----------------------------------- |
-| `/` and `/api/*` | `apps/web`          | Tailwind and portfolio CSS          |
-| `/jarvis`        | `packages/jarvis`   | StyleX and CSS Modules              |
-| `/canceldt`      | `packages/canceldt` | CANCELDT stylesheet and local fonts |
+| Public path                  | Implementation      | Styling                                   |
+| ---------------------------- | ------------------- | ----------------------------------------- |
+| `/` and `/api/*`             | `apps/web`          | Tailwind and portfolio CSS                |
+| `/learn` and `/learn/pstack` | `apps/web`          | Portfolio typography and scoped guide CSS |
+| `/jarvis`                    | `packages/jarvis`   | StyleX and CSS Modules                    |
+| `/canceldt`                  | `packages/canceldt` | CANCELDT stylesheet and local fonts       |
 
 Jarvis and CANCELDT keep their exclusive components, styles, application logic, assets,
 documentation and tests in their own packages. The Next app contains thin route entry
@@ -71,3 +72,20 @@ passed production verification.
 See [consolidation and verification](docs/next-consolidation.md),
 [Jarvis](docs/jarvis.md), [CANCELDT](docs/canceldt.md), and
 [spam filter API](docs/spam-api.md).
+
+## Learning guides
+
+`/learn` lists the guides; `/learn/pstack` is the first entry. The portfolio contents menu links to the index. Pstack's map, library, playbooks, original-text reader, and glossary live in `apps/web/src/components/learn/pstack`. Skill, document, and glossary hash links remain shareable within `/learn/pstack`.
+
+Both routes have distinct 1200 × 630 social previews, generated with `next/og` and the shared `learn/social-image.tsx` renderer. Next.js supplies the image URLs to Open Graph and Twitter metadata. The artwork reuses the site's palette, Libre Caslon Display, and DM Sans; the image fonts and their OFL licenses are bundled in `apps/web/src/assets/learn-og` and explicitly included in deployment tracing so rendering needs no external font service.
+
+The guide uses Next.js/React, the portfolio's DM Sans and Libre Caslon Display typography, the existing Lucide version, and native CSS/SVG. The Markdown reader loads on demand using `react-markdown` and `remark-gfm`; it is the only additional rendering stack. There is no separate Vite app, font package, diagram dependency, or backend deployment.
+
+The source snapshot is pinned to `cursor/plugins` commit `019a6a20592c10bf92869e5740368f578a9997fd`. All 136 source documents plus the upstream MIT license are served from `apps/web/public/learn/pstack/source`. Do not format or edit these documents. `source-integrity.json` records their SHA-256 hashes, and the content tests check every file and all annotation destinations. Glossary definitions and diagrams are editorial; the formatted source, raw view, copy, and downloads preserve the upstream wording.
+
+Validation for this area:
+
+```sh
+vp test run apps/web/src/components/learn/pstack/content.test.tsx
+WEB_TEST_ORIGIN=http://127.0.0.1:3004 vp run -F @personal/web test:e2e tests/e2e/learn.spec.ts
+```

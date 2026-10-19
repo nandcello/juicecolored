@@ -1,0 +1,58 @@
+/* Learn pages follow the system theme unless a saved choice pins one. */
+html {
+  color-scheme: light dark;
+}
+html[data-theme="light"] {
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+.learn-body {
+  background: light-dark(#f4f2e9, #1a1914);
+  color: light-dark(#25251f, #e6e6dd);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.28s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid color-mix(in oklab, currentColor 20%, transparent);
+  border-radius: 999px;
+}
+.theme-toggle label {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: color-mix(in oklab, currentColor 62%, transparent);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
+}
+.theme-toggle label:hover {
+  color: currentColor;
+}
+.theme-toggle label:has(:checked) {
+  color: currentColor;
+  background: color-mix(in oklab, currentColor 13%, transparent);
+}
+.theme-toggle label:has(:focus-visible) {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .theme-toggle label {
+    width: 36px;
+    height: 36px;
+  }
+}

@@ -14,6 +14,8 @@ const config: NextConfig = {
   skipTrailingSlashRedirect: true,
   outputFileTracingIncludes: {
     "/canceldt/api/og": ["../../packages/canceldt/src/assets/*"],
+    "/learn/opengraph-image-*": ["./src/assets/learn-og/*"],
+    "/learn/pstack/opengraph-image-*": ["./src/assets/learn-og/*"],
   },
   experimental: {
     globalNotFound: true,
