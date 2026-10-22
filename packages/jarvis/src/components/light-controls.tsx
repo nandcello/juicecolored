@@ -8,6 +8,8 @@ import c from "./dashboard.module.css";
 export function LightControls({
   device,
   busy,
+  pendingLabel,
+  optimistic = false,
   onCommand,
   onSave,
   onSettings,
@@ -15,6 +17,8 @@ export function LightControls({
 }: {
   device: LightDevice;
   busy: boolean;
+  pendingLabel?: string;
+  optimistic?: boolean;
   onCommand: Command;
   onSave: () => void;
   onSettings: () => void;
@@ -37,6 +41,8 @@ export function LightControls({
     <DeviceCard
       device={device}
       busy={busy}
+      pendingLabel={pendingLabel}
+      optimistic={optimistic}
       onCommand={send}
       onRefresh={onRefresh}
       onSettings={onSettings}

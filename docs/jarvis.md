@@ -60,3 +60,31 @@ Set `JARVIS_TEST_URL` to the unified development origin.
 Design references and protocol attribution remain in `packages/jarvis/PRODUCT.md`,
 `packages/jarvis/DESIGN.md`, `packages/jarvis/docs/design-contract.md`, and
 `packages/jarvis/THIRD_PARTY.md`.
+
+## Device state
+
+The snapshot API reads saved observations, not the appliances. The dashboard separately
+checks visible devices on mount (including pull-to-refresh reloads), on resume, and
+roughly every 30 seconds while visible. Reads share the command lock and pause during
+fan calibration or movement. Fan reads use MIoT `datasource: 2` to bypass Xiaomi's
+cloud cache; lights use device RPC. A failed read preserves the last successful
+reading's timestamp and appears as unavailable. A database poll alone cannot clear a
+failed device check. Cards show when they were checked and label old readings as last
+known. Power commands verify the reported power, with bounded read-only retries;
+unconfirmed commands are never resent automatically.
+
+After deployment, verify against connected hardware: change power using the physical
+button or Xiaomi Home, pull to refresh, and confirm both the displayed power and the
+reading time change. Disconnect an appliance and confirm it becomes unavailable rather
+than displaying a fresh on/off reading. The isolated UI suite simulates these cases;
+an empty local backend cannot establish that real hardware responds correctly.
+
+Device actions show the requested values immediately with a spinning “Applying…
+Waiting for device confirmation” status. This optimistic overlay never changes
+the saved reading or its timestamp. It remains until the command and resulting
+snapshot complete; failures remove it and show the last reported state with an
+error. Uncertain transport failures also mark that reading unavailable.
+The backend compares the changed properties (including modes, speed, brightness,
+effects and timers) against device reads, allowing for selected bulb transitions.
+Only reads are retried; writes are never replayed automatically. Direction nudges
+and saving power-on defaults have no directly readable target property.

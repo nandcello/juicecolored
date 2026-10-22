@@ -10,6 +10,8 @@ import c from "./dashboard.module.css";
 export function FanControls({
   device,
   busy,
+  pendingLabel,
+  optimistic = false,
   onCommand,
   onSettings,
   onRefresh,
@@ -17,6 +19,8 @@ export function FanControls({
 }: {
   device: FanDevice;
   busy: boolean;
+  pendingLabel?: string;
+  optimistic?: boolean;
   onCommand: Command;
   onSettings: () => void;
   onRefresh: () => void;
@@ -33,6 +37,8 @@ export function FanControls({
     <DeviceCard
       device={device}
       busy={busy}
+      pendingLabel={pendingLabel}
+      optimistic={optimistic}
       onCommand={onCommand}
       onRefresh={onRefresh}
       onSettings={onSettings}

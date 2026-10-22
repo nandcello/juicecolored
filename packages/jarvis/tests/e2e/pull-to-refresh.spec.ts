@@ -69,6 +69,9 @@ for (const mode of ["ios", "standard"] as const) {
     void simulation;
     await installed(page, mode);
     await page.goto("/jarvis");
+    await expect.poll(() => simulation.reads.length).toBe(3);
+    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+    simulation.physicalPower["fixture-fan"] = false;
     await expect
       .poll(() => page.evaluate(() => document.documentElement.style.overscrollBehaviorY))
       .toBe("none");
@@ -91,6 +94,10 @@ for (const mode of ["ios", "standard"] as const) {
     await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     await expect.poll(() => navigations).toBe(1);
     await expect(page.getByRole("heading", { name: "My home" })).toBeVisible();
+    await expect(
+      card(page, "Standing fan").getByRole("switch", { name: "Fan power" }),
+    ).not.toBeChecked();
+    await expect.poll(() => simulation.reads.length).toBe(6);
     expect(simulation.commands).toHaveLength(0);
   });
 }
@@ -112,6 +119,8 @@ test("short, cancelled, reversed, horizontal and multi-touch gestures do not rel
   void simulation;
   await installed(page);
   await page.goto("/jarvis");
+  await expect.poll(() => simulation.reads.length).toBe(3);
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
   let navigations = 0;
   page.on("framenavigated", (frame) => {
     if (frame === page.mainFrame()) navigations++;

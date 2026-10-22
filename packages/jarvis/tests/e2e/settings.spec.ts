@@ -95,6 +95,8 @@ test("remaining light and fan controls preserve their exact commands", async ({
 }) => {
   await page.goto("/jarvis");
   const light = card(page, "Ceiling light");
+  await expect.poll(() => simulation.reads.length).toBe(3);
+  await expect(light.getByRole("slider", { name: "Color temperature" })).toBeEnabled();
   await light.getByRole("slider", { name: "Color temperature" }).press("ArrowRight");
   await expect.poll(() => simulation.commands.at(-1)).toMatchObject({ action: "temperature" });
   await light.getByRole("button", { name: "Color", exact: true }).click();

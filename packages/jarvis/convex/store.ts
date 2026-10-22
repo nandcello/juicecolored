@@ -161,7 +161,7 @@ export const syncDevices = internalMutation({
       if (old)
         await ctx.db.patch(old._id, {
           model: device.model,
-          online: device.online,
+          online: device.online && old.online,
         });
       else
         await ctx.db.insert("devices", {
@@ -216,7 +216,8 @@ export const updateState = internalMutation({
       await ctx.db.patch(id, {
         ...data,
         error: data.error,
-        updatedAt: Date.now(),
+        // A failed attempt must not make an old observation look fresh.
+        updatedAt: data.state ? Date.now() : previous.updatedAt,
       });
     }
   },

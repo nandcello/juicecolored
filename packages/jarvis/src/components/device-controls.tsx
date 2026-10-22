@@ -1,7 +1,7 @@
 "use client";
 
-import { useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { ChevronRight, Fan, Lightbulb, RefreshCw, Settings2 } from "lucide-react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { ChevronRight, Fan, Lightbulb, LoaderCircle, RefreshCw, Settings2 } from "lucide-react";
 import type { Device } from "../lib/domain";
 import c from "./dashboard.module.css";
 
@@ -11,11 +11,13 @@ export function Switch({
   checked,
   disabled,
   onChange,
+  lastKnown = false,
 }: {
   label: string;
   checked: boolean;
   disabled: boolean;
   onChange: (on: boolean) => void;
+  lastKnown?: boolean;
 }) {
   return (
     <button
@@ -30,7 +32,7 @@ export function Switch({
       <span className={c.switchTrack}>
         <span />
       </span>
-      <span>{checked ? "On" : "Off"}</span>
+      <span>{lastKnown ? (checked ? "Last on" : "Last off") : checked ? "On" : "Off"}</span>
     </button>
   );
 }
@@ -135,6 +137,8 @@ export function Range({
 export function DeviceCard({
   device,
   busy,
+  pendingLabel,
+  optimistic = false,
   onCommand,
   onRefresh,
   onSettings,
@@ -143,6 +147,8 @@ export function DeviceCard({
 }: {
   device: Device;
   busy: boolean;
+  pendingLabel?: string;
+  optimistic?: boolean;
   onCommand: Command;
   onRefresh: () => void;
   onSettings: () => void;
@@ -150,13 +156,27 @@ export function DeviceCard({
   extras: ReactNode;
 }) {
   const titleId = useId();
+  const statusId = useId();
   const ready = device.online && device.updatedAt > 0;
+  // Null during SSR and hydration: saved state is never presented as live.
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const initial = setTimeout(() => setNow(Date.now()), 0);
+    const timer = setInterval(() => setNow(Date.now()), 5000);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(timer);
+    };
+  }, []);
+  const age = now === null ? Infinity : Math.max(0, now - device.updatedAt);
+  const recent = ready && age < 45000;
   const compact = ready && !device.state.power;
   const [expanded, setExpanded] = useState(false);
   const Icon = device.kind === "fan" ? Fan : Lightbulb;
   return (
     <section
       aria-labelledby={titleId}
+      aria-describedby={statusId}
       className={`${c.deviceCard} ${compact ? c.compactCard : ""}`}
     >
       <header className={c.deviceHeader}>
@@ -165,16 +185,62 @@ export function DeviceCard({
           <h3 id={titleId}>{device.name}</h3>
           <p>{device.room}</p>
         </div>
-        <Switch
-          label={`${device.kind === "fan" ? "Fan" : "Light"} power`}
-          checked={device.state.power}
-          disabled={busy || !ready || !device.capabilities.includes("power")}
-          onChange={(on) => void onCommand("power", { on })}
-        />
+        {device.updatedAt > 0 ? (
+          <Switch
+            label={`${device.kind === "fan" ? "Fan" : "Light"} power`}
+            checked={device.state.power}
+            lastKnown={!optimistic && (!recent || !!pendingLabel)}
+            disabled={busy || !ready || !device.capabilities.includes("power")}
+            onChange={(on) => void onCommand("power", { on })}
+          />
+        ) : (
+          <span className={c.muted}>Unknown</span>
+        )}
       </header>
+      <div
+        className={c.stateStatus}
+        id={statusId}
+        role="status"
+        aria-label={`${device.name} state`}
+      >
+        <span className={c.stateMessage}>
+          {pendingLabel && (
+            <LoaderCircle className={c.pendingSpinner} size={14} aria-hidden="true" />
+          )}
+          {pendingLabel ??
+            (device.updatedAt === 0
+              ? "Waiting for a device reading"
+              : !device.online
+                ? "Unavailable · last known state"
+                : recent
+                  ? age < 5000
+                    ? "Checked just now"
+                    : `Checked ${Math.floor(age / 1000)}s ago`
+                  : "Last known state · check again")}
+          {device.updatedAt > 0 && !recent && !pendingLabel && (
+            <>
+              {" · "}
+              <time dateTime={new Date(device.updatedAt).toISOString()}>
+                {new Date(device.updatedAt).toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </time>
+            </>
+          )}
+        </span>
+        <button
+          className={c.textButton}
+          disabled={busy}
+          onClick={onRefresh}
+          aria-label={`Refresh ${device.name}`}
+        >
+          <RefreshCw size={14} aria-hidden="true" /> Check now
+        </button>
+      </div>
       {!ready && (
         <div className={c.deviceWarning}>
-          <strong>{device.updatedAt ? "Offline · last known state" : "State not read yet"}</strong>
+          <strong>{device.updatedAt ? "Current state unavailable" : "State not read yet"}</strong>
           <p>
             {device.error ??
               "Refresh to check this device. Controls are unavailable until it responds."}

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { fanCommand, readFan, controlFan, FAN_PROPERTIES } from "../convex/adapters/fan";
 import type { CloudClient } from "../convex/adapters/yeelight";
 const values = {
@@ -21,6 +21,19 @@ export const fanRows = () =>
     value: values[name as keyof typeof values],
   }));
 describe("Standing Fan 2 adapter", () => {
+  it("bypasses Xiaomi's cloud cache when reading the actual fan", async () => {
+    const api = vi.fn(async (_path: string, data: { datasource?: number }) =>
+      fanRows().map((row) =>
+        row.siid === 2 && row.piid === 1 ? { ...row, value: data.datasource !== 2 } : row,
+      ),
+    );
+    const state = await readFan({ api } as unknown as CloudClient, "456");
+    expect(state.power).toBe(false);
+    expect(api).toHaveBeenCalledWith(
+      "/miotspec/prop/get",
+      expect.objectContaining({ datasource: 2 }),
+    );
+  });
   it("maps speed, oscillation, wind mode, timer and motor control to their exact MIoT properties", () => {
     expect(fanCommand("456", "speed", { speed: 73 })).toEqual({
       did: "456",

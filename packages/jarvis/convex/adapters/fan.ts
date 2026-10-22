@@ -90,7 +90,9 @@ export async function readFan(client: CloudClient, id: string): Promise<FanState
     siid,
     piid,
   }));
-  const raw = await client.api("/miotspec/prop/get", { params });
+  // Xiaomi's default may return its cloud cache. datasource=2 asks the device.
+  // https://github.com/MiEcosystem/miot-plugin-sdk/wiki/04-miot_spec
+  const raw = await client.api("/miotspec/prop/get", { params, datasource: 2 });
   if (!Array.isArray(raw)) throw new Error("Unable to read fan properties.");
   const values = Object.fromEntries(
     Object.entries(FAN_PROPERTIES).map(([name, [siid, piid]]) => {

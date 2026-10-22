@@ -8,9 +8,14 @@ export async function request<T = Record<string, unknown> & { warning?: string }
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(operation),
+          signal: AbortSignal.timeout(120000),
         }
-      : { cache: "no-store" },
-  );
+      : { cache: "no-store", signal: AbortSignal.timeout(20000) },
+  ).catch((error: unknown) => {
+    if (error instanceof Error && error.name === "TimeoutError")
+      throw new Error("Confirmation timed out. Check the device before trying again.");
+    throw error;
+  });
   const data = await response.json();
   if (!response.ok) {
     if (response.status === 401 && operation?.type !== "login") window.location.reload();

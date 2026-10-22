@@ -49,6 +49,147 @@ async function seed(t: ReturnType<typeof convexTest>) {
   });
 }
 describe("Convex device workflow", () => {
+  it("manual refresh replaces saved power with a device reading", async () => {
+    const t = convexTest(schema, modules);
+    const { id } = await seed(t);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({
+        code: 0,
+        result: ["off", "50", "4000", "16777215", "0", "0", "2", "0", "0", "Bulb"],
+      }),
+    );
+    await t.action(api.gateway.execute, { secret, operation: { type: "refresh", id } });
+    expect((await t.query(api.store.snapshot, { secret })).devices[0]).toMatchObject({
+      online: true,
+      state: { power: false },
+    });
+  });
+  it("failed reads preserve the last successful observation time and discovery cannot repair them", async () => {
+    const t = convexTest(schema, modules);
+    const { id, accountId } = await seed(t);
+    await t.run(async (ctx) => {
+      await ctx.db.patch(id, { updatedAt: 1234 });
+    });
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Timeout"));
+    await expect(
+      t.action(api.gateway.execute, { secret, operation: { type: "refresh", id } }),
+    ).rejects.toThrow("Unable to read");
+    await t.mutation(internal.store.syncDevices, {
+      accountId,
+      devices: [
+        { externalId: "123", name: "Cloud light", model: "yeelink.light.color3", online: true },
+      ],
+    });
+    expect((await t.query(api.store.snapshot, { secret })).devices[0]).toMatchObject({
+      online: false,
+      updatedAt: 1234,
+      state: { power: true },
+    });
+  });
+  it("rechecks a delayed power change without sending the command twice", async () => {
+    const t = convexTest(schema, modules);
+    const { id } = await seed(t);
+    const reading = (power: string) =>
+      Response.json({
+        code: 0,
+        result: [power, "50", "4000", "16777215", "0", "0", "2", "0", "0", "Bulb"],
+      });
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ code: 0, result: ["ok"] }))
+      .mockResolvedValueOnce(reading("on"))
+      .mockResolvedValueOnce(reading("off"));
+    await expect(
+      t.action(api.gateway.execute, {
+        secret,
+        operation: { type: "control", id, action: "power", data: { on: false } },
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect((await t.query(api.store.snapshot, { secret })).devices[0].state.power).toBe(false);
+  });
+  it("does not report success when acknowledged power still disagrees with the device", async () => {
+    const t = convexTest(schema, modules);
+    const { id } = await seed(t);
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () =>
+        Response.json({
+          code: 0,
+          result: ["on", "50", "4000", "16777215", "0", "0", "2", "0", "0", "Bulb"],
+        }),
+      )
+      .mockResolvedValueOnce(Response.json({ code: 0, result: ["ok"] }));
+    await expect(
+      t.action(api.gateway.execute, {
+        secret,
+        operation: { type: "control", id, action: "power", data: { on: false } },
+      }),
+    ).resolves.toMatchObject({ ok: true, warning: expect.stringContaining("still reports on") });
+    const snapshot = await t.query(api.store.snapshot, { secret });
+    expect(snapshot.devices[0].state.power).toBe(true);
+    expect(snapshot.activity[0].status).toBe("error");
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+  it("waits for brightness confirmation without repeating the write", async () => {
+    const t = convexTest(schema, modules);
+    const { id } = await seed(t);
+    const reading = (brightness: string) =>
+      Response.json({
+        code: 0,
+        result: ["on", brightness, "4000", "16777215", "0", "0", "2", "0", "0", "Bulb"],
+      });
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ code: 0, result: ["ok"] }))
+      .mockResolvedValueOnce(reading("50"))
+      .mockResolvedValueOnce(reading("80"));
+    await expect(
+      t.action(api.gateway.execute, {
+        secret,
+        operation: {
+          type: "control",
+          id,
+          action: "brightness",
+          data: { brightness: 80, duration: 30 },
+        },
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect((await t.query(api.store.snapshot, { secret })).devices[0].state).toMatchObject({
+      brightness: 80,
+    });
+  });
+  it("records an error when brightness never reaches the requested value", async () => {
+    const t = convexTest(schema, modules);
+    const { id } = await seed(t);
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () =>
+        Response.json({
+          code: 0,
+          result: ["on", "50", "4000", "16777215", "0", "0", "2", "0", "0", "Bulb"],
+        }),
+      )
+      .mockResolvedValueOnce(Response.json({ code: 0, result: ["ok"] }));
+    await expect(
+      t.action(api.gateway.execute, {
+        secret,
+        operation: {
+          type: "control",
+          id,
+          action: "brightness",
+          data: { brightness: 80, duration: 30 },
+        },
+      }),
+    ).resolves.toMatchObject({
+      warning: expect.stringContaining("requested setting was not confirmed"),
+    });
+    const snapshot = await t.query(api.store.snapshot, { secret });
+    expect(snapshot.devices[0].state).toMatchObject({ brightness: 50 });
+    expect(snapshot.activity[0].status).toBe("error");
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
   it("rejects unauthenticated reads and commands", async () => {
     const t = convexTest(schema, modules);
     await expect(t.query(api.store.snapshot, { secret: "wrong" })).rejects.toThrow("Unauthorized");

@@ -16,6 +16,8 @@ test("all common controls are exposed and route to the correct device", async ({
   await expect(bedroom.getByRole("switch", { name: "Light power" })).toBeVisible();
   await expect(bedroom.getByRole("slider")).toHaveCount(0);
   await expect(fan.getByRole("button", { name: "Set off timer", exact: true })).not.toBeVisible();
+  await expect.poll(() => simulation.reads.length).toBe(3);
+  await expect(fan.getByRole("slider", { name: "Fan speed" })).toBeEnabled();
   await fan.getByRole("slider", { name: "Fan speed" }).press("ArrowRight");
   await expect
     .poll(() => simulation.commands.at(-1))
@@ -124,6 +126,8 @@ test("failed and pending commands stay honest and are never retried", async ({
 }) => {
   await page.goto("/jarvis");
   const fan = card(page, "Standing fan");
+  await expect.poll(() => simulation.reads.length).toBe(3);
+  await expect(fan.getByRole("slider", { name: "Fan speed" })).toBeEnabled();
   simulation.failNext = true;
   await fan.getByRole("slider", { name: "Fan speed" }).press("ArrowRight");
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
@@ -131,6 +135,9 @@ test("failed and pending commands stay honest and are never retried", async ({
   );
   await expect(fan.getByRole("slider", { name: "Fan speed" })).toHaveValue("45");
   expect(simulation.commands).toHaveLength(1);
+  await expect(fan.getByRole("switch", { name: "Fan power" })).toBeDisabled();
+  await fan.getByRole("button", { name: "Refresh Standing fan", exact: true }).click();
+  await expect(fan.getByRole("switch", { name: "Fan power" })).toBeEnabled();
   simulation.delay = 600;
   await fan.getByRole("switch", { name: "Oscillate" }).click();
   await expect(fan.getByRole("switch", { name: "Oscillate" })).toBeDisabled();

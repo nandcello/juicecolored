@@ -20,6 +20,10 @@ export type Operation = {
 export type Simulation = {
   state: Snapshot;
   commands: Operation[];
+  reads: string[];
+  physicalPower: Record<string, boolean>;
+  failedReads: Set<string>;
+  readDelay: number;
   failNext: boolean;
   delay: number;
   loginPending: boolean;
@@ -32,6 +36,10 @@ export const test = base.extend<{ simulation: Simulation }>({
     const simulation: Simulation = {
       state: structuredClone(fixture) as Snapshot,
       commands: [],
+      reads: [],
+      physicalPower: {},
+      failedReads: new Set(),
+      readDelay: 0,
       failNext: false,
       delay: 0,
       loginPending: true,
@@ -61,6 +69,25 @@ export const test = base.extend<{ simulation: Simulation }>({
     await page.route("**/api/jarvis", async (route) => {
       if (route.request().method() === "GET") return route.fulfill({ json: simulation.state });
       const op: Operation = route.request().postDataJSON();
+      if (op.type === "refresh") {
+        simulation.reads.push(op.id!);
+        if (simulation.readDelay)
+          await new Promise((resolve) => setTimeout(resolve, simulation.readDelay));
+        const device = simulation.state.devices.find((d) => d.id === op.id);
+        if (device) {
+          if (simulation.failedReads.has(device.id)) {
+            device.online = false;
+            device.error = "Unable to read the device.";
+            return route.fulfill({ status: 502, json: { error: device.error } });
+          }
+          if (device.id in simulation.physicalPower)
+            device.state.power = simulation.physicalPower[device.id];
+          device.online = true;
+          device.error = undefined;
+          device.updatedAt = Date.now();
+        }
+        return route.fulfill({ json: { ok: true } });
+      }
       simulation.commands.push(op);
       if (simulation.delay) await new Promise((resolve) => setTimeout(resolve, simulation.delay));
       if (simulation.failNext) {
@@ -252,7 +279,7 @@ export const test = base.extend<{ simulation: Simulation }>({
           }
           if (op.action === "scene") Object.assign(device.state, data, { power: true });
         }
-        device.updatedAt++;
+        device.updatedAt = Date.now();
       }
       return route.fulfill({ json: { ok: true } });
     });

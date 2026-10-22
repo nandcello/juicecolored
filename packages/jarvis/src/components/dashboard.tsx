@@ -107,7 +107,7 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
                     ? "Activity"
                     : "Settings"}
             </h1>
-            {view === "devices" && <p>Devices</p>}
+            {view === "devices" && <p>Device readings update every 30 seconds while open.</p>}
           </div>
           <button className={`${c.textButton} ${c.desktopAdd}`} onClick={openConnect}>
             <Plus size={22} />
@@ -138,6 +138,11 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
         <span role="status" className={c.srOnly}>
           {busy ? "Updating devices…" : ""}
         </span>
+        {view !== "devices" && controller.pending && (
+          <div className={c.notice} role="status">
+            {controller.pending.label}
+          </div>
+        )}
         {view === "devices" ? (
           <>
             {rooms.length > 0 && (
@@ -165,6 +170,12 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
                           .map((d) => {
                             const shared = {
                               busy,
+                              optimistic:
+                                controller.pending?.id === d.id && !!controller.pending.optimistic,
+                              pendingLabel:
+                                controller.pending?.id === d.id
+                                  ? controller.pending.label
+                                  : undefined,
                               onCommand: (action: string, data?: Record<string, unknown>) =>
                                 command(d.id, action, data),
                               onSettings: () => openDevice(d.id, "device"),

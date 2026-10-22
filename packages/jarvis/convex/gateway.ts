@@ -1,4 +1,5 @@
 "use node";
+import { expectedCommandState, matchesCommandState } from "../command-state";
 import { readFan, controlFan, FAN_MODEL } from "./adapters/fan";
 import { randomUUID } from "node:crypto";
 import { action } from "./_generated/server";
@@ -152,7 +153,13 @@ async function discover(ctx: ActionCtx) {
     })),
   });
   // Bound upstream requests; remaining devices refresh when selected by the owner.
-  await Promise.allSettled(ids.slice(0, 4).map((id) => refresh(ctx, client, id)));
+  for (const id of ids.slice(0, 4)) {
+    try {
+      await refresh(ctx, client, id);
+    } catch {
+      // Keep discovering other devices; refresh records each failure.
+    }
+  }
   return { found: ids.length };
 }
 export const execute = action({
@@ -355,17 +362,45 @@ export const execute = action({
         // Never retry a command automatically: a network timeout can follow successful delivery.
         let warning: string | undefined;
         try {
-          await refresh(ctx, client, op.id);
+          const expected = expectedCommandState(device.kind, op.action, op.data);
+          // Bulbs can take the selected transition duration to reach the target.
+          // The UI stays optimistic while we wait, then verify with real reads.
+          if (
+            device.kind === "light" &&
+            ["power", "brightness", "temperature", "color"].includes(op.action)
+          )
+            await new Promise((resolve) => setTimeout(resolve, op.data.duration ?? 500));
+          let observed = await refresh(ctx, client, op.id);
+          // Delivery acknowledgement is not confirmation of the requested setting.
+          // Only repeat reads, never writes, while the device settles.
+          for (
+            let attempt = 0;
+            !matchesCommandState(observed, expected) && attempt < 2;
+            attempt++
+          ) {
+            await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
+            observed = await refresh(ctx, client, op.id);
+          }
+          if (!matchesCommandState(observed, expected))
+            warning =
+              op.action === "power"
+                ? `The device accepted the command but still reports ${observed.power ? "on" : "off"}. Showing its reported state.`
+                : "The device accepted the command but the requested setting was not confirmed. Showing its reported state.";
         } catch {
           warning = "The device accepted the command, but its state could not be refreshed.";
         }
         await ctx.runMutation(internal.store.event, {
           deviceName: device.name,
-          label,
-          status: "success",
+          label: warning ? "Command accepted — state not confirmed" : label,
+          status: warning ? "error" : "success",
         });
         return { ok: true, ...(warning ? { warning } : {}) };
       } catch (error) {
+        await ctx.runMutation(internal.store.updateState, {
+          id: op.id,
+          online: false,
+          error: "Command not confirmed. Refresh to check the device's current state.",
+        });
         await ctx.runMutation(internal.store.event, {
           deviceName: device.name,
           label: "Command not confirmed — refresh before retrying",

@@ -51,10 +51,14 @@ test("offline and unverified devices retain honest state and disabled controls",
   simulation.state.devices[0].online = false;
   simulation.state.devices[0].error = "Fan is not responding.";
   simulation.state.devices[1].updatedAt = 0;
+  simulation.failedReads.add("fixture-fan");
+  simulation.failedReads.add("fixture-light");
   await page.goto("/jarvis");
   await card(page, "Standing fan").getByText("More controls", { exact: true }).click();
   await card(page, "Standing fan").getByRole("button", { name: "Refresh", exact: true }).click();
-  await expect(card(page, "Standing fan").getByText("Offline · last known state")).toBeVisible();
+  await expect(
+    card(page, "Standing fan").getByText("Unavailable · last known state"),
+  ).toBeVisible();
   await expect(
     card(page, "Standing fan").getByRole("switch", { name: "Fan power" }),
   ).toBeDisabled();
