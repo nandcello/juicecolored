@@ -1,6 +1,7 @@
 import { PROPS, makeCommand } from "./vendor/controls.mjs";
 import { XiaomiClient } from "./vendor/xiaomi.mjs";
 import type { LightState } from "../../domain";
+import { expectedCommandState, matchesCommandState } from "../../command-state";
 
 export type Session = {
   userId?: string;
@@ -80,4 +81,23 @@ export async function readLight(client: CloudClient, externalId: string): Promis
     flowing: p.flowing === "1",
     offInMinutes: Number(p.delayoff) || 0,
   };
+}
+
+export async function readLightAfterCommand(
+  client: CloudClient,
+  id: string,
+  action: string,
+  data: ControlData,
+) {
+  // Preserve production's transition/readback behavior for the local transport.
+  if (["power", "brightness", "temperature", "color"].includes(action))
+    await new Promise((resolve) => setTimeout(resolve, data.duration ?? 500));
+  const expected = expectedCommandState("light", action, data);
+  let state = await readLight(client, id);
+  for (const delay of [750, 1500]) {
+    if (matchesCommandState(state, expected)) break;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    state = await readLight(client, id);
+  }
+  return { state, confirmed: matchesCommandState(state, expected) };
 }

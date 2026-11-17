@@ -5,6 +5,7 @@ import { FAN_END_CHECK_MS, FAN_LEASE_MS, FAN_SETTLE_MS, validTravelSteps } from 
 import { directionFor, requireReadyFan } from "./fanDirectionStore";
 import { finish, leaseFor } from "./fanMotionState";
 import { completeCalibrationStep } from "./fanCalibration";
+import { usesLocalControl } from "./localConfig";
 
 const identity = { deviceId: v.id("devices"), token: v.string() };
 const stepIdentity = { ...identity, step: v.number() };
@@ -117,7 +118,7 @@ export const claim = internalMutation({
       .query("integrations")
       .withIndex("by_provider", (q) => q.eq("provider", "xiaomi"))
       .unique();
-    if (!account) {
+    if (!account || (account.requiresReconnect && !usesLocalControl(device.externalId))) {
       await finish(ctx, row, "Connect Xiaomi Home before calibrating.");
       return null;
     }

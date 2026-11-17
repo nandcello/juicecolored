@@ -1,0 +1,2 @@
+convex==0.8.1
+python-miio==0.5.12

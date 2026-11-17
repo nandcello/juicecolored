@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { bridgeRequest, bridgeStatus } from "./bridgeContract";
 export const lightState = v.object({
   power: v.boolean(),
   brightness: v.number(),
@@ -49,6 +50,18 @@ export const fanSetup = v.object({
   settleMs: v.number(),
 });
 export default defineSchema({
+  bridgePresence: defineTable({
+    name: v.literal("home"),
+    lastSeenAt: v.number(),
+  }).index("by_name", ["name"]),
+  bridgeJobs: defineTable({
+    ...bridgeRequest,
+    status: bridgeStatus,
+    expiresAt: v.number(),
+    claim: v.optional(v.string()),
+    result: v.optional(v.any()),
+    error: v.optional(v.string()),
+  }).index("by_status", ["status"]),
   fanDirections: defineTable({
     deviceId: v.id("devices"),
     travelSteps: v.number(),
@@ -65,6 +78,7 @@ export default defineSchema({
     encryptedSession: v.string(),
     connectedAt: v.number(),
     region: v.string(),
+    requiresReconnect: v.optional(v.boolean()),
   }).index("by_provider", ["provider"]),
   logins: defineTable({
     key: v.string(),

@@ -20,6 +20,9 @@ export async function signedParams(path,data,security,nonce){
 }
 const REGION_HOST={sg:'sg.api.io.mi.com',cn:'api.io.mi.com',de:'de.api.io.mi.com',us:'us.api.io.mi.com',ru:'ru.api.io.mi.com',in:'in.api.io.mi.com',i2:'i2.api.io.mi.com',tw:'tw.api.io.mi.com'};
 const ALLOWED=new Set(['account.xiaomi.com','sts.api.io.mi.com',...Object.values(REGION_HOST)]);
+export class XiaomiAuthError extends Error {
+  constructor(){super('Xiaomi authorization expired or was rejected. Reconnect your Xiaomi Home account in Settings.');this.name='XiaomiAuthError';}
+}
 export function safeURL(value){const url=new URL(value,'https://account.xiaomi.com');if(url.protocol!=='https:'||url.username||url.password||url.port||(!ALLOWED.has(url.hostname)&&!url.hostname.endsWith('.account.xiaomi.com')))throw new Error('Xiaomi returned an unexpected address. Please reconnect.');return url;}
 export class XiaomiClient {
   constructor(session={}){this.session=session;this.session.cookies??=[];this.session.agent??='Mozilla/5.0 APP/com.xiaomi.mihome APPV/10.5.201';}
@@ -75,16 +78,16 @@ export class XiaomiClient {
     const {fields,key}=await signedParams(path,data,this.session.ssecurity);
     const response=await fetch(`https://${host}/app${path}`,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(15000),headers:{'User-Agent':this.session.agent,'Content-Type':'application/x-www-form-urlencoded','MIOT-ENCRYPT-ALGORITHM':'ENCRYPT-RC4','x-xiaomi-protocal-flag-cli':'PROTOCAL-HTTP2','Cookie':`userId=${this.session.userId}; serviceToken=${this.session.serviceToken}; yetAnotherServiceToken=${this.session.serviceToken}; locale=en_US; timezone=GMT%2B08%3A00; is_daylight=0; dst_offset=0; channel=MI_APP_STORE`},body:new URLSearchParams(fields)});
     if(response.status>=300&&response.status<400){await response.body?.cancel();throw new Error('Xiaomi returned an unexpected redirect. Reconnect your account if this persists.');}
-    if([401,403].includes(response.status))throw new Error('Xiaomi authorization expired or was rejected. Reconnect your Xiaomi Home account.');
+    if([401,403].includes(response.status))throw new XiaomiAuthError();
     if(!response.ok)throw new Error(`Xiaomi cloud is unavailable (${response.status}). Try again shortly.`);
     const text=await response.text();let result;
     try{result=JSON.parse(text);}catch{try{result=JSON.parse(dec.decode(rc4(key,unb64(text))));}catch{throw new Error('Cannot read Xiaomi’s response. Reconnect your Xiaomi Home account.');}}
-    if(result.code&&result.code!==0)throw new Error([2,3].includes(result.code)?'Xiaomi authorization expired. Reconnect your account.':`Xiaomi rejected the request (code ${result.code}).`);
+    if(result.code&&result.code!==0){if([2,3].includes(result.code))throw new XiaomiAuthError();throw new Error(`Xiaomi rejected the request (code ${result.code}).`);}
     return result.result;
   }
   async devices(){
     let rows=[];
-    try{const result=await this.api('/home/device_list',{getVirtualModel:true,getHuamiDevices:0});rows=result?.list||[];}catch(error){if(/authorization/.test(error.message))throw error;}
+    try{const result=await this.api('/home/device_list',{getVirtualModel:true,getHuamiDevices:0});rows=result?.list||[];}catch(error){if(error instanceof XiaomiAuthError)throw error;}
     if(!rows.length){
       const homes=await this.api('/v2/homeroom/gethome',{fg:true,fetch_share:true,fetch_share_dev:true,limit:300,app_ver:7});
       for(const home of (homes?.homelist||[]).slice(0,15)){

@@ -18,7 +18,7 @@ export function useDashboard(initial: Snapshot) {
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [qr, setQR] = useState<QR | null>(null);
-  const [region, setRegion] = useState("sg");
+  const [region, setRegion] = useState(initial.region);
   const [stale, setStale] = useState(false);
   const [unverified, setUnverified] = useState<Set<string>>(() => new Set());
   const [pending, setPending] = useState<{ id: string; label: string; optimistic?: Device } | null>(
@@ -49,7 +49,9 @@ export function useDashboard(initial: Snapshot) {
   const activeRoom = room !== null && rooms.includes(room) ? room : null;
   const visible = shownDevices.filter((d) => activeRoom === null || d.room === activeRoom);
   const refreshIds = JSON.stringify(
-    view === "devices" ? visible.map((d) => d.id) : device ? [device.id] : [],
+    (view === "devices" ? visible : device ? [device] : [])
+      .filter((d) => !state.requiresReconnect || d.transport === "local")
+      .map((d) => d.id),
   );
 
   function markUnverified(id: string, failed: boolean) {
@@ -281,6 +283,7 @@ export function useDashboard(initial: Snapshot) {
   }
   function openConnect() {
     setQR(null);
+    setRegion(state.region);
     setDialog("connect");
   }
   async function startLogin() {

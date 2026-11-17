@@ -34,11 +34,42 @@ The owner passphrase is the `JARVIS_OWNER_PASSPHRASE` entry in `.env.credentials
 - Confirmed command history and explicit error reporting.
 - Selected device refreshes every minute while the dashboard is visible; **Refresh** reads immediately. The browser checks the stored snapshot every 15 seconds, every 1.5 seconds during background movement, and when returning to the page. Physical background refreshes pause during movement.
 
-Commands are serialized per Xiaomi account. A command is never automatically retried: a timeout can occur after a successful physical change. A confirmed command followed by a failed state read is reported separately. Previously reported state is retained and labeled offline on read failure.
+Commands are serialized per Xiaomi account. Predictable controls update immediately and show “Applying… Waiting for device confirmation” while awaiting the command and server snapshot. They settle to the reported state on completion, including rollback and an explanation on failure. Lost responses trigger a snapshot read, never a repeated command.
+
+Fan status reads explicitly request fresh device values. After a fan command, Jarvis checks the changed setting with at most three reads, waiting 500 ms and then 1500 ms if needed. If it does not converge, the last reported state and a confirmation warning are saved; the warning survives reloads. Direction nudges cannot confirm a physical position. Previously reported state is retained and labeled offline on read failure. Optimistic display state itself is temporary and is discarded on reload; backend confirmation continues independently.
 
 Device controls become available after an actual property read, not just cloud discovery. Scene commands can turn an off light on. Other appearance controls require power on. Firmware, Wi-Fi provisioning, account sharing, music sync and recurring automations remain in Xiaomi Home.
 
 ## Structure
+
+### Persistent local control
+
+The production bulb and fan use a bridge on Bathala through the Apple TV's
+Tailscale subnet route. Device tokens are stored only in Bathala's private
+`~/.config/jarvis-bridge/devices.json`; they are not sent to the browser or stored
+in the command queue. `JARVIS_LOCAL_DEVICE_IDS` selects the paired device IDs in
+Convex, and `JARVIS_BRIDGE_SECRET` authenticates only the bridge endpoints.
+
+`bridge/worker.py` subscribes outbound to Convex over TLS and sends authenticated
+miIO requests over the home subnet. It uses async subscriptions so idle waits
+do not block its heartbeat or address discovery. It rediscovers configured
+device IDs after DHCP changes. Requests expire after 12 seconds, are claimed
+once, and are never replayed after a timeout, lost acknowledgement, or worker
+restart. Paired devices do not fall back to Xiaomi cloud commands.
+
+On Bathala, `jarvis-bridge.service` is an enabled user service with lingering and
+automatic restart. The virtual environment and worker are under
+`~/.local/share/jarvis-bridge/`; `bridge/requirements.txt` pins direct dependencies.
+Restart only this service with `systemctl --user restart jarvis-bridge`.
+Keep the Apple TV powered and configured as an Apple Home hub so it stays
+network-connected during sleep. Device resets can invalidate local tokens.
+
+The local-control backend and Bathala worker are deployed independently of the
+shared website. The frontend keeps local controls available after cloud sign-in
+expires and offers reconnection for cloud devices. Frontend changes ship through
+the shared website's Git deployment from `master`.
+
+### Package layout
 
 - `src/app/`: page, root layout, and authenticated HTTP route implementation.
 - `src/components/`: Jarvis-only UI components, CSS Modules and StyleX component styles.

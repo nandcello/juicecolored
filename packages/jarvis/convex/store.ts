@@ -2,6 +2,7 @@ import { internalMutation, internalQuery, query } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { deviceState, sceneFields } from "./schema";
 import { requireGateway } from "./security";
+import { usesLocalControl } from "./localConfig";
 import {
   deleteDirection,
   directionChanged,
@@ -25,11 +26,13 @@ export const snapshot = query({
     ]);
     return {
       connected: !!account,
+      requiresReconnect: account?.requiresReconnect ?? false,
       region: account?.region ?? "sg",
       devices: await Promise.all(
         devices.map(
           async ({
             _id,
+            externalId,
             name,
             room,
             kind,
@@ -49,12 +52,17 @@ export const snapshot = query({
             kind,
             provider,
             model,
-            online,
+            transport: usesLocalControl(externalId) ? "local" : "cloud",
+            online: account?.requiresReconnect && !usesLocalControl(externalId) ? false : online,
             capabilities,
             state,
             updatedAt,
             ...(kind === "fan" ? { direction: publicDirection(await directionFor(ctx, _id)) } : {}),
-            ...(error ? { error } : {}),
+            ...(account?.requiresReconnect && !usesLocalControl(externalId)
+              ? { error: "Xiaomi sign-in is required. Reconnect your account in Settings." }
+              : error
+                ? { error }
+                : {}),
           }),
         ),
       ),
@@ -93,7 +101,13 @@ export const putLogin = internalMutation({
   },
 });
 export const connect = internalMutation({
-  args: { key: v.string(), encryptedSession: v.string(), region: v.string() },
+  args: {
+    key: v.string(),
+    encryptedSession: v.string(),
+    region: v.string(),
+    // Supplied only after comparing the authenticated Xiaomi identities in the action.
+    previousSession: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const login = await ctx.db
       .query("logins")
@@ -105,6 +119,22 @@ export const connect = internalMutation({
       .query("integrations")
       .withIndex("by_provider", (q) => q.eq("provider", "xiaomi"))
       .unique();
+    if (previous && args.previousSession === previous.encryptedSession) {
+      await ctx.db.patch(previous._id, {
+        encryptedSession: args.encryptedSession,
+        connectedAt: Date.now(),
+        requiresReconnect: false,
+      });
+      for (const device of await ctx.db.query("devices").collect()) {
+        await ctx.db.patch(device._id, {
+          online: false,
+          error: "Account reconnected. Refresh to check this device's current state.",
+        });
+        await invalidateDirection(ctx, device._id);
+      }
+      await ctx.db.delete(login._id);
+      return;
+    }
     if (previous) await ctx.db.delete(previous._id);
     // A new account must not inherit devices from an earlier account.
     for (const row of await ctx.db.query("devices").collect()) {
@@ -118,6 +148,23 @@ export const connect = internalMutation({
       connectedAt: Date.now(),
     });
     await ctx.db.delete(login._id);
+  },
+});
+export const requireReconnect = internalMutation({
+  args: { encryptedSession: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { encryptedSession }) => {
+    const account = await ctx.db
+      .query("integrations")
+      .withIndex("by_provider", (q) => q.eq("provider", "xiaomi"))
+      .unique();
+    // A delayed failure from an old request must not invalidate a fresh sign-in.
+    if (account?.encryptedSession === encryptedSession && !account.requiresReconnect) {
+      await ctx.db.patch(account._id, { requiresReconnect: true });
+      for (const device of await ctx.db.query("devices").take(3000))
+        if (!usesLocalControl(device.externalId)) await invalidateDirection(ctx, device._id);
+    }
+    return null;
   },
 });
 export const disconnect = internalMutation({
@@ -216,7 +263,7 @@ export const updateState = internalMutation({
       await ctx.db.patch(id, {
         ...data,
         error: data.error,
-        // A failed attempt must not make an old observation look fresh.
+        // Failed reads do not turn an old observation into a fresh one.
         updatedAt: data.state ? Date.now() : previous.updatedAt,
       });
     }

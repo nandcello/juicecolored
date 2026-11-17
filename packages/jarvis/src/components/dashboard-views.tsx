@@ -152,10 +152,18 @@ export function DashboardViews({
       <section className={c.panel}>
         <div className={c.row}>
           <h2>Xiaomi Home</h2>
-          <span className={c.muted}>{state.connected ? "Connected" : "Not connected"}</span>
+          <span className={c.muted}>
+            {state.requiresReconnect
+              ? "Sign-in required"
+              : state.connected
+                ? "Account linked"
+                : "Not connected"}
+          </span>
         </div>
         <p className={c.muted}>
-          Connect your Yeelight lights and Mi Smart Standing Fan 2 through Xiaomi Home.
+          {state.devices.some((d) => d.transport === "local")
+            ? "Paired devices use local control through your home connection. Xiaomi sign-in is needed to find or pair additional devices."
+            : "Connect your Yeelight lights and Mi Smart Standing Fan 2 through Xiaomi Home."}
         </p>
         <div className={c.extraActions}>
           <button className={c.primaryButton} disabled={busy} onClick={openConnect}>
@@ -173,7 +181,7 @@ export function DashboardViews({
         </div>
         <button
           className={c.button}
-          disabled={busy || !state.connected}
+          disabled={busy || !state.connected || state.requiresReconnect}
           onClick={() => void task({ type: "discover" }, "Device search complete.")}
         >
           <RefreshCw size={17} /> Find devices

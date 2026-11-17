@@ -1,6 +1,5 @@
 "use node";
-import { expectedCommandState, matchesCommandState } from "../command-state";
-import { readFan, controlFan, FAN_MODEL } from "./adapters/fan";
+import { readFan, readFanAfterCommand, controlFan, FAN_MODEL } from "./adapters/fan";
 import { randomUUID } from "node:crypto";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -9,8 +8,11 @@ import type { Id } from "./_generated/dataModel";
 import { v, ConvexError } from "convex/values";
 import { requireGateway } from "./security";
 import { seal, unseal, verifyPassword } from "./crypto";
-import { createClient, command, readLight } from "./adapters/yeelight";
-import type { CloudClient } from "./adapters/yeelight";
+import { createClient, command, readLight, readLightAfterCommand } from "./adapters/yeelight";
+import type { CloudClient, ControlData } from "./adapters/yeelight";
+import { accountClient } from "./accountClient";
+import { XiaomiAuthError } from "./adapters/vendor/xiaomi.mjs";
+import { hasLocalControl, usesLocalControl } from "./localConfig";
 const controlData = v.object({
   on: v.optional(v.boolean()),
   speed: v.optional(v.number()),
@@ -112,32 +114,58 @@ export const login = action({
 async function account(ctx: ActionCtx) {
   const account = await ctx.runQuery(internal.store.account, {});
   if (!account) throw new Error("Connect Xiaomi Home first.");
+  if (account.requiresReconnect && !hasLocalControl()) throw new XiaomiAuthError();
   return {
     account,
-    client: createClient(unseal(account.encryptedSession, "xiaomi:account")),
+    client: accountClient(ctx, account.encryptedSession, account.requiresReconnect),
   };
 }
-async function refresh(ctx: ActionCtx, client: CloudClient, id: Id<"devices">) {
+async function refresh(
+  ctx: ActionCtx,
+  client: CloudClient,
+  id: Id<"devices">,
+  command?: { action: string; data: ControlData },
+) {
   const d = await ctx.runQuery(internal.store.device, { id });
   if (!d) throw new Error("Device no longer exists. Refresh your device list.");
   try {
-    const state =
-      d.kind === "fan"
-        ? await readFan(client, d.externalId)
-        : await readLight(client, d.externalId);
+    const { state, confirmed } =
+      d.kind === "fan" && command
+        ? await readFanAfterCommand(client, d.externalId, command.action, command.data)
+        : d.kind === "light" && command
+          ? await readLightAfterCommand(client, d.externalId, command.action, command.data)
+          : {
+              state:
+                d.kind === "fan"
+                  ? await readFan(client, d.externalId)
+                  : await readLight(client, d.externalId),
+              confirmed: true,
+            };
+    const warning = confirmed
+      ? undefined
+      : command?.action === "power"
+        ? `The device accepted the command but still reports ${state.power ? "on" : "off"}. Showing its reported state.`
+        : d.kind === "fan"
+          ? "The fan accepted the command, but the reported setting has not changed. Showing its last reported state. Refresh to check again."
+          : "The bulb accepted the command, but the requested setting was not confirmed. Showing its reported state.";
     await ctx.runMutation(internal.store.updateState, {
       id,
       online: true,
       state,
+      ...(warning ? { error: warning } : {}),
     });
-    return state;
-  } catch {
+    return { state, warning };
+  } catch (error) {
+    if (error instanceof XiaomiAuthError) throw error;
+    const message = usesLocalControl(d.externalId)
+      ? "Unable to read the device locally. Check Bathala, Apple TV, and the device's Wi-Fi, then refresh."
+      : "Unable to read the device. Check power and Xiaomi Home, then refresh.";
     await ctx.runMutation(internal.store.updateState, {
       id,
       online: false,
-      error: "Unable to read the device. Check power and Xiaomi Home, then refresh.",
+      error: message,
     });
-    throw new Error("Unable to read the device. Check power and Xiaomi Home, then refresh.");
+    throw new Error(message);
   }
 }
 async function discover(ctx: ActionCtx) {
@@ -249,10 +277,22 @@ export const execute = action({
           throw new Error("This code expired or was replaced. Create a new one.");
         const client = createClient(unseal(login.encryptedSession, "xiaomi:login:" + op.key));
         if (!(await client.pollQR())) return { pending: true };
+        const previous = await ctx.runQuery(internal.store.account, {});
+        let previousSession: string | undefined;
+        if (previous && previous.region === client.session.region) {
+          try {
+            const old = unseal(previous.encryptedSession, "xiaomi:account");
+            if (old.userId && old.userId === client.session.userId)
+              previousSession = previous.encryptedSession;
+          } catch {
+            // An unreadable prior identity cannot safely inherit another account's devices.
+          }
+        }
         await ctx.runMutation(internal.store.connect, {
           key: op.key,
           encryptedSession: seal(client.session, "xiaomi:account"),
           region: client.session.region!,
+          ...(previousSession ? { previousSession } : {}),
         });
         await ctx.runMutation(internal.store.event, {
           deviceName: "Xiaomi Home",
@@ -306,7 +346,7 @@ export const execute = action({
       }
       if (op.type === "saveScene") {
         if (device.kind !== "light") throw new Error("Choose a light to save a scene.");
-        const state = await refresh(ctx, client, op.id);
+        const { state } = await refresh(ctx, client, op.id);
         if (!("brightness" in state)) throw new Error("Choose a light to save a scene.");
         if (!state.power) throw new Error("Turn the light on before saving a scene.");
         command("scene", state);
@@ -362,30 +402,7 @@ export const execute = action({
         // Never retry a command automatically: a network timeout can follow successful delivery.
         let warning: string | undefined;
         try {
-          const expected = expectedCommandState(device.kind, op.action, op.data);
-          // Bulbs can take the selected transition duration to reach the target.
-          // The UI stays optimistic while we wait, then verify with real reads.
-          if (
-            device.kind === "light" &&
-            ["power", "brightness", "temperature", "color"].includes(op.action)
-          )
-            await new Promise((resolve) => setTimeout(resolve, op.data.duration ?? 500));
-          let observed = await refresh(ctx, client, op.id);
-          // Delivery acknowledgement is not confirmation of the requested setting.
-          // Only repeat reads, never writes, while the device settles.
-          for (
-            let attempt = 0;
-            !matchesCommandState(observed, expected) && attempt < 2;
-            attempt++
-          ) {
-            await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
-            observed = await refresh(ctx, client, op.id);
-          }
-          if (!matchesCommandState(observed, expected))
-            warning =
-              op.action === "power"
-                ? `The device accepted the command but still reports ${observed.power ? "on" : "off"}. Showing its reported state.`
-                : "The device accepted the command but the requested setting was not confirmed. Showing its reported state.";
+          ({ warning } = await refresh(ctx, client, op.id, op));
         } catch {
           warning = "The device accepted the command, but its state could not be refreshed.";
         }

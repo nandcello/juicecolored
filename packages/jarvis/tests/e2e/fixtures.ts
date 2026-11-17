@@ -26,6 +26,9 @@ export type Simulation = {
   readDelay: number;
   failNext: boolean;
   delay: number;
+  commandGate?: Promise<void>;
+  unconfirmedNext?: boolean;
+  loseNextResponse?: boolean;
   loginPending: boolean;
   motionError: boolean;
   setupAttempts: number;
@@ -89,6 +92,7 @@ export const test = base.extend<{ simulation: Simulation }>({
         return route.fulfill({ json: { ok: true } });
       }
       simulation.commands.push(op);
+      if (simulation.commandGate) await simulation.commandGate;
       if (simulation.delay) await new Promise((resolve) => setTimeout(resolve, simulation.delay));
       if (simulation.failNext) {
         simulation.failNext = false;
@@ -114,6 +118,13 @@ export const test = base.extend<{ simulation: Simulation }>({
         return route.fulfill({ json: { connected: true } });
       }
       const device = simulation.state.devices.find((d) => d.id === op.id);
+      if (device && op.type === "control" && simulation.unconfirmedNext) {
+        simulation.unconfirmedNext = false;
+        const warning =
+          "The fan accepted the command, but the reported setting has not changed. Showing its last reported state. Refresh to check again.";
+        device.error = warning;
+        return route.fulfill({ json: { ok: true, warning } });
+      }
       if (device?.kind === "fan") {
         if (op.type === "fanSetup") {
           simulation.setupAttempts = 0;
@@ -280,6 +291,10 @@ export const test = base.extend<{ simulation: Simulation }>({
           if (op.action === "scene") Object.assign(device.state, data, { power: true });
         }
         device.updatedAt = Date.now();
+      }
+      if (simulation.loseNextResponse) {
+        simulation.loseNextResponse = false;
+        return route.abort("failed");
       }
       return route.fulfill({ json: { ok: true } });
     });

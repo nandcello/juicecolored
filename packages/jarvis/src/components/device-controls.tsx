@@ -238,6 +238,12 @@ export function DeviceCard({
           <RefreshCw size={14} aria-hidden="true" /> Check now
         </button>
       </div>
+      {ready && device.error && (
+        <div className={c.deviceWarning} role="status">
+          <strong>Setting not confirmed</strong>
+          <p>{device.error}</p>
+        </div>
+      )}
       {!ready && (
         <div className={c.deviceWarning}>
           <strong>{device.updatedAt ? "Current state unavailable" : "State not read yet"}</strong>

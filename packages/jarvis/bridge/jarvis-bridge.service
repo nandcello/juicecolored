@@ -1,0 +1,15 @@
+[Unit]
+Description=Jarvis local device bridge
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/jarvis-bridge/venv/bin/python %h/.local/share/jarvis-bridge/worker.py
+Restart=always
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

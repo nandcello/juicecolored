@@ -8,10 +8,12 @@
  * @module
  */
 
+import type * as accountClient from "../accountClient.js";
 import type * as adapters_fan from "../adapters/fan.js";
 import type * as adapters_vendor_controls from "../adapters/vendor/controls.js";
 import type * as adapters_vendor_xiaomi from "../adapters/vendor/xiaomi.js";
 import type * as adapters_yeelight from "../adapters/yeelight.js";
+import type * as bridgeContract from "../bridgeContract.js";
 import type * as crypto from "../crypto.js";
 import type * as fanCalibration from "../fanCalibration.js";
 import type * as fanDirectionStore from "../fanDirectionStore.js";
@@ -19,6 +21,9 @@ import type * as fanMotion from "../fanMotion.js";
 import type * as fanMotionActions from "../fanMotionActions.js";
 import type * as fanMotionState from "../fanMotionState.js";
 import type * as gateway from "../gateway.js";
+import type * as localBridge from "../localBridge.js";
+import type * as localClient from "../localClient.js";
+import type * as localConfig from "../localConfig.js";
 import type * as security from "../security.js";
 import type * as store from "../store.js";
 
@@ -29,10 +34,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accountClient: typeof accountClient;
   "adapters/fan": typeof adapters_fan;
   "adapters/vendor/controls": typeof adapters_vendor_controls;
   "adapters/vendor/xiaomi": typeof adapters_vendor_xiaomi;
   "adapters/yeelight": typeof adapters_yeelight;
+  bridgeContract: typeof bridgeContract;
   crypto: typeof crypto;
   fanCalibration: typeof fanCalibration;
   fanDirectionStore: typeof fanDirectionStore;
@@ -40,6 +47,9 @@ declare const fullApi: ApiFromModules<{
   fanMotionActions: typeof fanMotionActions;
   fanMotionState: typeof fanMotionState;
   gateway: typeof gateway;
+  localBridge: typeof localBridge;
+  localClient: typeof localClient;
+  localConfig: typeof localConfig;
   security: typeof security;
   store: typeof store;
 }>;

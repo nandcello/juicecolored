@@ -37,6 +37,7 @@ type DeviceBase = {
   provider: "xiaomi";
   model: string;
   online: boolean;
+  transport?: "local" | "cloud";
   capabilities: Capability[];
   hidden?: boolean;
   updatedAt: number;
@@ -67,6 +68,7 @@ export type Activity = {
 };
 export type Snapshot = {
   connected: boolean;
+  requiresReconnect?: boolean;
   devices: Device[];
   scenes: Scene[];
   activity: Activity[];

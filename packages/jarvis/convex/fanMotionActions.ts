@@ -3,9 +3,9 @@
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { createClient } from "./adapters/yeelight";
+import { accountClient } from "./accountClient";
+import { XiaomiAuthError } from "./adapters/vendor/xiaomi.mjs";
 import { controlFan, readFan } from "./adapters/fan";
-import { unseal } from "./crypto";
 import type { FanState } from "../domain";
 
 export const step = internalAction({
@@ -15,12 +15,13 @@ export const step = internalAction({
     try {
       const claimed = await ctx.runMutation(internal.fanMotion.claim, args);
       if (!claimed) return null;
-      const client = createClient(unseal(claimed.encryptedSession, "xiaomi:account"));
+      const client = accountClient(ctx, claimed.encryptedSession);
       const checkState = async () => {
         let state: FanState;
         try {
           state = await readFan(client, claimed.externalId);
-        } catch {
+        } catch (error) {
+          if (error instanceof XiaomiAuthError) throw error;
           await ctx.runMutation(internal.store.updateState, {
             id: args.deviceId,
             online: false,

@@ -90,8 +90,7 @@ export async function readFan(client: CloudClient, id: string): Promise<FanState
     siid,
     piid,
   }));
-  // Xiaomi's default may return its cloud cache. datasource=2 asks the device.
-  // https://github.com/MiEcosystem/miot-plugin-sdk/wiki/04-miot_spec
+  // Xiaomi's default can return cached values, including immediately after a write.
   const raw = await client.api("/miotspec/prop/get", { params, datasource: 2 });
   if (!Array.isArray(raw)) throw new Error("Unable to read fan properties.");
   const values = Object.fromEntries(
@@ -117,6 +116,30 @@ export async function readFan(client: CloudClient, id: string): Promise<FanState
     sound: boolean(values.sound),
     childLock: boolean(values.childLock),
   };
+}
+export async function readFanAfterCommand(
+  client: CloudClient,
+  id: string,
+  action: string,
+  data: ControlData,
+) {
+  const expected = fanCommand(id, action, data);
+  const property = (Object.keys(FAN_PROPERTIES) as (keyof typeof FAN_PROPERTIES)[]).find(
+    (key) => FAN_PROPERTIES[key][0] === expected.siid && FAN_PROPERTIES[key][1] === expected.piid,
+  );
+  // Direction is a write-only nudge; its physical position cannot be read back.
+  const matches = (state: FanState) => {
+    if (!property) return true;
+    const observed = property === "mode" ? (state.mode === "natural" ? 1 : 0) : state[property];
+    return observed === expected.value;
+  };
+  let state = await readFan(client, id);
+  for (const delay of [500, 1500]) {
+    if (matches(state)) break;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    state = await readFan(client, id);
+  }
+  return { state, confirmed: matches(state) };
 }
 export async function controlFan(
   client: CloudClient,

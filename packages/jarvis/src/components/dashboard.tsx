@@ -114,7 +114,19 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
             Add device
           </button>
         </header>
-        {stale && (
+        {state.requiresReconnect && (
+          <div className={c.warning} role="alert">
+            <p>
+              {state.devices.some((d) => d.transport === "local")
+                ? "Xiaomi cloud sign-in expired. Local device controls continue to work. Reconnect to find or pair additional devices."
+                : "Xiaomi rejected the saved sign-in. Device availability is unknown until you reconnect. Refreshing cannot renew this session."}
+            </p>
+            <button className={c.button} disabled={busy} onClick={openConnect}>
+              Reconnect Xiaomi Home
+            </button>
+          </div>
+        )}
+        {stale && !state.requiresReconnect && (
           <div className={c.warning} role="status">
             Connection interrupted. Showing the last known state. Open More controls → Refresh to
             check a device.

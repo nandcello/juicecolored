@@ -14,7 +14,9 @@ This personal app uses a generated owner passphrase and a signed HttpOnly cookie
 
 ## State reflects evidence
 
-Cloud discovery alone does not mean the device has responded. `updatedAt=0` means no property read has succeeded. Failed reads retain previous values and mark the device offline. Commands are absolute (on/off), require a successful acknowledgment, and are never retried automatically. Refreshes are safe to repeat. Command leases prevent overlapping writes across tabs, and token-checked release prevents an expired owner from releasing a later request's lease.
+Cloud discovery alone does not mean the device has responded. `updatedAt=0` means no property read has succeeded. Failed device reads retain previous values and mark the device unavailable. Xiaomi authorization failures instead set an account-level `requiresReconnect` flag: the snapshot disables controls without inventing new device state or a new observation timestamp. A successful same-user, same-region sign-in preserves device settings and measured fan travel, while invalidating estimated position and requiring fresh reads. Commands are absolute (on/off), require a successful acknowledgment, and are never retried automatically. Refreshes are safe to repeat. Command leases prevent overlapping writes across tabs, and token-checked release prevents an expired owner from releasing a later request's lease.
+
+The current cloud session has no automatic renewal path. See the [connectivity investigation](connectivity-investigation.md) for recovery and the local bridge architecture needed to remove service-token expiry from everyday control.
 
 ## Cache only shareable content
 
