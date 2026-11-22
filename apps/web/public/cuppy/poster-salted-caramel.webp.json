@@ -1,0 +1,4 @@
+{
+  "prompt": "Origin: rendered in-browser from the original procedural three.js model in apps/web/src/components/cuppy/scene.ts (swirl geometry in swirl.ts). Captured by a Playwright script calling canvas.toDataURL(\"image/webp\", 0.86) at a 720x1068 CSS stage (1.5x DPR), reduced-motion resting pose, one capture per flavor. No brand artwork, photography, or generated imagery. The printed pixel-sunglasses label is a user-approved nod to the Cuppy mascot; Cuppy brand rights apply (publication permission pending).\n",
+  "createdAt": "2026-11-22T14:43:04.135Z"
+}

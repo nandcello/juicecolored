@@ -1,0 +1,733 @@
+/* Cuppy concept. Own root layout, so nothing here reaches the portfolio. */
+
+:root {
+  --cuppy-purple: #c397c4;
+  --cuppy-cream: #f2e6d2;
+  --cuppy-ink: #17131a;
+  --cuppy-chocolate: #58362e;
+  --cuppy-caramel: #d59d58;
+  --cuppy-coral: #f15d65;
+  --cuppy-plum: #3a2240;
+  --cuppy-pad: clamp(1rem, 3.2vw, 2.75rem);
+  --cuppy-font: var(--font-archivo), "Arial Narrow", Arial, sans-serif;
+  /* "STRETCHES." in Archivo 900 at 125% width measures 8.27em. */
+  --cuppy-word-size: calc((100vw - 2 * var(--cuppy-pad)) / 8.36);
+  --cuppy-lead-size: clamp(1.75rem, 5.4vw, 5.25rem);
+  --cuppy-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background: var(--cuppy-purple);
+}
+
+.cuppy-body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--cuppy-purple);
+  color: var(--cuppy-ink);
+  font-family: var(--cuppy-font);
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  font-stretch: 100%;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  accent-color: var(--cuppy-ink);
+  caret-color: var(--cuppy-ink);
+}
+
+.cuppy-body ::selection {
+  background: var(--cuppy-ink);
+  color: var(--cuppy-cream);
+}
+
+.cuppy-body :focus-visible {
+  outline: 3px solid var(--cuppy-ink);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+:where(.cuppy) :where(h1, h2, p, ol, fieldset) {
+  margin: 0;
+  padding: 0;
+}
+
+.cuppy-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Hero ---------- */
+
+.cuppy-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* Stops short of the fold so a lip of the flavor field shows and the flood is seen. */
+  min-height: max(calc(100svh - 4.5rem), 38rem);
+  padding: 0 var(--cuppy-pad) var(--cuppy-pad);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.cuppy-masthead {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: 4.5rem;
+}
+
+.cuppy-wordmark {
+  font-size: 1.375rem;
+  font-weight: 900;
+  font-stretch: 125%;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.cuppy-wordmark span {
+  margin-left: 0.35em;
+  font-size: 0.55em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  vertical-align: 0.3em;
+}
+
+.cuppy-masthead-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cuppy-concept-tag {
+  padding: 0.35rem 0.7rem;
+  border: 2px solid var(--cuppy-ink);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-stretch: 112%;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.cuppy-motion-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0 0.25rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.3em;
+}
+
+.cuppy-motion-toggle svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.cuppy-motion-toggle:hover {
+  text-decoration-color: transparent;
+}
+
+.cuppy-headline {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  /* The scene puts its ground line 10% above the stage's bottom edge. */
+  --cuppy-stage-h: calc(100% - var(--cuppy-lead-size) * 0.6);
+}
+
+.cuppy-title {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  font-weight: 900;
+  font-stretch: 125%;
+  line-height: 0.86;
+  text-transform: uppercase;
+}
+
+.cuppy-title-lead {
+  display: block;
+  margin-top: clamp(0.5rem, 2vh, 1.5rem);
+  font-size: var(--cuppy-lead-size);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.cuppy-title-gap {
+  display: block;
+  flex: 1;
+  min-height: 2rem;
+}
+
+.cuppy-title-word {
+  display: block;
+  margin-bottom: -0.06em;
+  font-size: var(--cuppy-word-size);
+  letter-spacing: -0.02em;
+  line-height: 0.82;
+  white-space: nowrap;
+}
+
+/* The canvas floats above the word so the cup's shadow lands on the letters. */
+.cuppy-stage {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: calc(var(--cuppy-word-size) * 0.5 - var(--cuppy-stage-h) * 0.1);
+  width: min(46vw, 74svh, 44rem);
+  height: var(--cuppy-stage-h);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.cuppy-poster,
+.cuppy-canvas-host,
+.cuppy-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* The poster is a still of the same model and camera, so the swap is seamless. */
+.cuppy-poster {
+  object-fit: contain;
+  object-position: 50% 100%;
+}
+
+.cuppy-stage[data-status="live"] .cuppy-poster {
+  visibility: hidden;
+}
+
+.cuppy-canvas {
+  display: block;
+}
+
+.cuppy-stage:not([data-status="live"]) .cuppy-canvas {
+  visibility: hidden;
+}
+
+.cuppy-sparkle {
+  position: absolute;
+  z-index: 3;
+  fill: var(--cuppy-ink);
+  pointer-events: none;
+  animation: cuppy-twinkle 3.2s ease-in-out infinite;
+}
+
+.cuppy-sparkle-a {
+  top: 30%;
+  left: calc(50% - min(19vw, 30svh));
+  width: clamp(1.5rem, 2.6vw, 2.5rem);
+}
+
+.cuppy-sparkle-b {
+  top: 22%;
+  left: calc(50% + min(15vw, 24svh));
+  width: clamp(1rem, 1.6vw, 1.5rem);
+  animation-delay: -1.1s;
+}
+
+.cuppy-sparkle-c {
+  top: 52%;
+  left: calc(50% + min(18vw, 29svh));
+  width: clamp(1.75rem, 3vw, 2.75rem);
+  animation-delay: -2.2s;
+}
+
+@keyframes cuppy-twinkle {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(0.72) rotate(12deg);
+  }
+}
+
+.cuppy-pitch,
+.cuppy-flavors {
+  position: absolute;
+  z-index: 3;
+  bottom: calc(var(--cuppy-pad) + var(--cuppy-word-size) * 0.86 + clamp(1.5rem, 4vh, 3rem));
+}
+
+.cuppy-pitch {
+  left: var(--cuppy-pad);
+  display: grid;
+  justify-items: start;
+  gap: 1.5rem;
+  width: min(23rem, calc(50% - min(23vw, 37svh, 22rem) - var(--cuppy-pad) - 1rem));
+}
+
+.cuppy-pitch p {
+  font-size: clamp(1rem, 1.25vw, 1.1875rem);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.cuppy-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 3.25rem;
+  padding: 0 1.4rem 0 1.6rem;
+  border-radius: 999px;
+  background: var(--cuppy-ink);
+  color: var(--cuppy-cream);
+  font-size: 0.875rem;
+  font-weight: 800;
+  font-stretch: 118%;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px -14px rgb(23 19 26 / 0.7);
+  transition:
+    transform 0.25s var(--cuppy-ease-out),
+    box-shadow 0.25s var(--cuppy-ease-out);
+}
+
+.cuppy-button svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  transition: transform 0.25s var(--cuppy-ease-out);
+}
+
+.cuppy-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 28px -16px rgb(23 19 26 / 0.8);
+}
+
+.cuppy-button:hover svg {
+  transform: translate(2px, -2px);
+}
+
+.cuppy-button:active {
+  transform: translateY(0);
+}
+
+.cuppy-button-cream {
+  background: var(--cuppy-cream);
+  color: var(--cuppy-ink);
+  box-shadow: none;
+}
+
+.cuppy-button-cream:focus-visible {
+  outline-color: var(--cuppy-cream);
+}
+
+/* Flavor chips: cup silhouettes, echoing the picker on cuppyicecream.com. */
+.cuppy-flavors {
+  right: var(--cuppy-pad);
+  border: 0;
+  min-width: 0;
+}
+
+.cuppy-flavors legend {
+  margin-bottom: 0.75rem;
+  padding: 0;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  font-stretch: 118%;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.cuppy-flavor-options {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.cuppy-chip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(9.5rem, 13vw, 11.5rem);
+  aspect-ratio: 168 / 112;
+  color: var(--chip-ink);
+  cursor: pointer;
+  transition: transform 0.35s var(--cuppy-ease-out);
+}
+
+.cuppy-chip input {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.cuppy-chip-cup {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: var(--chip-fill);
+  stroke: var(--cuppy-ink);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 8px 10px rgb(58 34 64 / 0.22));
+  transition: filter 0.35s var(--cuppy-ease-out);
+}
+
+.cuppy-chip-name {
+  position: relative;
+  margin-top: 0.9rem;
+  padding: 0 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  font-stretch: 118%;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.cuppy-chip-sparkle {
+  position: absolute;
+  top: -0.35rem;
+  right: 0.35rem;
+  width: 1.5rem;
+  fill: var(--cuppy-ink);
+  opacity: 0;
+  transform: scale(0.4) rotate(-30deg);
+  transition:
+    opacity 0.3s var(--cuppy-ease-out),
+    transform 0.45s var(--cuppy-ease-out);
+}
+
+.cuppy-chip:hover {
+  transform: translateY(-3px);
+}
+
+.cuppy-chip:has(input:checked) {
+  transform: translateX(-0.6rem) scale(1.04);
+}
+
+.cuppy-chip:has(input:checked) .cuppy-chip-cup {
+  stroke-width: 4.5;
+  filter: drop-shadow(0 14px 14px rgb(58 34 64 / 0.32));
+}
+
+.cuppy-chip:has(input:checked) .cuppy-chip-sparkle {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+.cuppy-chip:has(input:focus-visible) {
+  outline: 3px solid var(--cuppy-ink);
+  outline-offset: 5px;
+  border-radius: 12px;
+}
+
+/* ---------- Flavor band: the page takes the chosen flavor's color ---------- */
+
+.cuppy-flavor {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: end;
+  gap: clamp(2rem, 5vw, 5rem);
+  padding: clamp(4rem, 9vw, 7.5rem) var(--cuppy-pad);
+  background: var(--flavor-field);
+  color: var(--flavor-ink);
+  transition:
+    background-color 0.6s var(--cuppy-ease-out),
+    color 0.6s var(--cuppy-ease-out);
+}
+
+.cuppy-flavor-copy {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.cuppy-flavor h2 {
+  font-size: clamp(2.75rem, 8.4vw, 7.5rem);
+  font-weight: 900;
+  font-stretch: 125%;
+  letter-spacing: -0.03em;
+  line-height: 0.88;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.cuppy-flavor-copy p {
+  max-width: 30ch;
+  font-size: clamp(1.125rem, 1.7vw, 1.5rem);
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.cuppy-ritual {
+  display: grid;
+  gap: 0.2em;
+  font-size: clamp(1.75rem, 3.6vw, 3.25rem);
+  font-weight: 800;
+  font-stretch: 112%;
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+  list-style: none;
+  text-transform: uppercase;
+}
+
+.cuppy-ritual li {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+}
+
+.cuppy-ritual li:nth-child(2) {
+  padding-left: 1.1em;
+}
+
+.cuppy-ritual li:nth-child(3) {
+  padding-left: 2.2em;
+}
+
+.cuppy-ritual-sparkle {
+  flex: none;
+  width: 0.6em;
+  fill: currentColor;
+}
+
+/* ---------- Close ---------- */
+
+.cuppy-close {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  align-items: end;
+  gap: clamp(2rem, 5vw, 5rem);
+  padding: clamp(4.5rem, 10vw, 8rem) var(--cuppy-pad) clamp(3rem, 6vw, 5rem);
+  background: var(--cuppy-ink);
+  color: var(--cuppy-cream);
+}
+
+.cuppy-close h2 {
+  font-size: clamp(2.25rem, 5.6vw, 5.25rem);
+  font-weight: 900;
+  font-stretch: 125%;
+  letter-spacing: -0.025em;
+  line-height: 0.92;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.cuppy-close h2 span {
+  color: var(--cuppy-purple);
+}
+
+.cuppy-close-action {
+  display: grid;
+  justify-items: start;
+  gap: 1.5rem;
+}
+
+.cuppy-close-action p {
+  max-width: 28ch;
+  font-size: 1.125rem;
+}
+
+.cuppy-footer {
+  padding: 1.75rem var(--cuppy-pad) 2.5rem;
+  border-top: 1px solid rgb(242 230 210 / 0.18);
+  background: var(--cuppy-ink);
+  color: rgb(242 230 210 / 0.74);
+}
+
+.cuppy-footer p {
+  max-width: 72ch;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+/* ---------- Narrow screens: stack the controls under the word ---------- */
+
+@media (max-width: 959px) {
+  :root {
+    --cuppy-lead-size: clamp(1.75rem, 9.6vw, 4rem);
+  }
+
+  .cuppy-hero {
+    min-height: 0;
+    padding-bottom: clamp(2.5rem, 8vw, 4rem);
+  }
+
+  .cuppy-masthead {
+    height: 4rem;
+  }
+
+  .cuppy-wordmark {
+    font-size: 1.125rem;
+  }
+
+  .cuppy-concept-tag {
+    font-size: 0.6875rem;
+  }
+
+  .cuppy-headline {
+    flex: none;
+    /* Reaches up behind the lead so the cup sits inside the sentence. */
+    --cuppy-stage-h: calc(
+      clamp(18rem, 50svh, 32rem) + var(--cuppy-lead-size) * 1.9 + var(--cuppy-word-size) * 0.4
+    );
+  }
+
+  .cuppy-title {
+    flex: none;
+  }
+
+  .cuppy-title-gap {
+    flex: none;
+    height: clamp(18rem, 50svh, 32rem);
+  }
+
+  .cuppy-stage {
+    width: min(100vw, 34rem);
+  }
+
+  .cuppy-sparkle-a {
+    top: 26%;
+    left: 8%;
+  }
+
+  .cuppy-sparkle-b {
+    top: 16%;
+    left: auto;
+    right: 12%;
+  }
+
+  .cuppy-sparkle-c {
+    top: 44%;
+    left: auto;
+    right: 6%;
+  }
+
+  .cuppy-pitch,
+  .cuppy-flavors {
+    position: relative;
+    inset: auto;
+    width: auto;
+  }
+
+  .cuppy-flavors {
+    order: 3;
+    margin-top: 2rem;
+  }
+
+  .cuppy-flavors legend {
+    text-align: center;
+    width: 100%;
+  }
+
+  .cuppy-flavor-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .cuppy-chip {
+    width: 100%;
+  }
+
+  .cuppy-chip-name {
+    padding: 0 0.6rem;
+    font-size: clamp(0.6875rem, 2.8vw, 0.8125rem);
+    font-stretch: 100%;
+    letter-spacing: 0.02em;
+  }
+
+  .cuppy-chip:has(input:checked) {
+    transform: translateY(-0.4rem) scale(1.04);
+  }
+
+  .cuppy-pitch {
+    order: 4;
+    margin-top: 2rem;
+  }
+
+  .cuppy-flavor,
+  .cuppy-close {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  /* Keep the concept disclosure; the motion control goes icon-only with its name intact. */
+  .cuppy-motion-toggle span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .cuppy-motion-toggle {
+    min-width: 2.75rem;
+    justify-content: center;
+  }
+
+  .cuppy-wordmark span {
+    display: none;
+  }
+
+  .cuppy-concept-tag {
+    padding: 0.25rem 0.55rem;
+    border-width: 1.5px;
+    font-size: 0.625rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cuppy-sparkle {
+    animation: none;
+  }
+
+  .cuppy-chip,
+  .cuppy-chip-cup,
+  .cuppy-chip-sparkle,
+  .cuppy-button,
+  .cuppy-button svg,
+  .cuppy-flavor {
+    transition: none;
+  }
+}
+
+.cuppy:has(.cuppy-motion-toggle[aria-pressed="true"]) .cuppy-sparkle {
+  animation-play-state: paused;
+}

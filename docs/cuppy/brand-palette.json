@@ -1,0 +1,51 @@
+{
+  "source": "https://cuppyicecream.com/",
+  "method": "Exact CSS variables and color declarations, not estimated from photographs",
+  "colors": {
+    "purple": "#C397C4",
+    "cream": "#F2E6D2",
+    "ink": "#17131A",
+    "chocolate": "#58362E",
+    "caramel": "#D59D58",
+    "coral": "#F15D65"
+  },
+  "contrastChecks": [
+    {
+      "foreground": "ink",
+      "background": "purple",
+      "ratio": 7.47,
+      "normalTextAA": true
+    },
+    {
+      "foreground": "ink",
+      "background": "cream",
+      "ratio": 14.88,
+      "normalTextAA": true
+    },
+    {
+      "foreground": "cream",
+      "background": "purple",
+      "ratio": 1.99,
+      "normalTextAA": false
+    },
+    {
+      "foreground": "cream",
+      "background": "chocolate",
+      "ratio": 8.59,
+      "normalTextAA": true
+    },
+    {
+      "foreground": "ink",
+      "background": "caramel",
+      "ratio": 7.68,
+      "normalTextAA": true
+    },
+    {
+      "foreground": "ink",
+      "background": "coral",
+      "ratio": 5.67,
+      "normalTextAA": true
+    }
+  ],
+  "guidance": "Prefer ink on lavender/cream; cream on lavender is decorative large-display only if measured contrast supports it, otherwise use ink."
+}
