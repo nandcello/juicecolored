@@ -129,3 +129,121 @@ export function weldSeamNormals(normals: Float32Array, rowLength: number, rows: 
     normals[first + 2] = normals[last + 2] = z;
   }
 }
+
+export type SwirlPiece = SwirlGeometryData & {
+  /** Center of the cut face, in swirl space. */
+  cutCenter: [number, number, number];
+  /** Mean radius of the cut ring. */
+  cutRadius: number;
+};
+
+/**
+ * Splits the swirl at a row into the base that stays in the cup and the top
+ * that the spoon lifts. Each piece closes its cut with a shallow dome that
+ * bulges into the other piece, so the joined swirl looks untouched and either
+ * half looks like soft serve once they part.
+ */
+export function splitSwirl(
+  data: SwirlGeometryData,
+  cutV: number,
+  options: { capRows?: number; dome?: number } = {},
+): { base: SwirlPiece; top: SwirlPiece } {
+  const capRows = options.capRows ?? 10;
+  const dome = options.dome ?? 0.14;
+  const { rowLength, rows } = data;
+  const cutRow = Math.min(rows - 2, Math.max(1, Math.round(cutV * (rows - 1))));
+
+  let cx = 0;
+  let cy = 0;
+  let cz = 0;
+  for (let i = 0; i < rowLength - 1; i++) {
+    const p = (cutRow * rowLength + i) * 3;
+    cx += data.positions[p];
+    cy += data.positions[p + 1];
+    cz += data.positions[p + 2];
+  }
+  const count = rowLength - 1;
+  cx /= count;
+  cy /= count;
+  cz /= count;
+  let cutRadius = 0;
+  for (let i = 0; i < count; i++) {
+    const p = (cutRow * rowLength + i) * 3;
+    cutRadius += Math.hypot(data.positions[p] - cx, data.positions[p + 2] - cz);
+  }
+  cutRadius /= count;
+
+  function piece(fromRow: number, toRow: number, capAtEnd: boolean): SwirlPiece {
+    const bodyRows = toRow - fromRow + 1;
+    const total = bodyRows + capRows;
+    const positions = new Float32Array(total * rowLength * 3);
+    const uvs = new Float32Array(total * rowLength * 2);
+    const occlusion = new Float32Array(total * rowLength);
+    const ring = (target: number, source: number) => {
+      positions.set(
+        data.positions.subarray(source * rowLength * 3, (source + 1) * rowLength * 3),
+        target * rowLength * 3,
+      );
+      uvs.set(
+        data.uvs.subarray(source * rowLength * 2, (source + 1) * rowLength * 2),
+        target * rowLength * 2,
+      );
+      occlusion.set(
+        data.occlusion.subarray(source * rowLength, (source + 1) * rowLength),
+        target * rowLength,
+      );
+    };
+    // Base: body rows, then cap rows closing upward. Top: cap rows opening
+    // downward-to-up, then body rows.
+    const capStart = capAtEnd ? bodyRows : 0;
+    const bodyStart = capAtEnd ? 0 : capRows;
+    for (let r = 0; r < bodyRows; r++) ring(bodyStart + r, fromRow + r);
+    const sign = capAtEnd ? 1 : -1;
+    for (let k = 0; k < capRows; k++) {
+      // Distance from the cut ring toward the apex, 1/capRows .. 1.
+      const step = capAtEnd ? k + 1 : capRows - k;
+      const a = (step / capRows) * (Math.PI / 2);
+      const shrink = Math.cos(a);
+      const lift = Math.sin(a) * dome * sign;
+      const target = capStart + k;
+      for (let i = 0; i < rowLength; i++) {
+        const src = (cutRow * rowLength + i) * 3;
+        const dst = (target * rowLength + i) * 3;
+        positions[dst] = cx + (data.positions[src] - cx) * shrink;
+        positions[dst + 1] = cy + (data.positions[src + 1] - cy) * shrink + lift;
+        positions[dst + 2] = cz + (data.positions[src + 2] - cz) * shrink;
+        const uv = (target * rowLength + i) * 2;
+        uvs[uv] = data.uvs[(cutRow * rowLength + i) * 2];
+        uvs[uv + 1] = cutV;
+        occlusion[target * rowLength + i] = 0.96;
+      }
+    }
+    const quads = total - 1;
+    const indices = new Uint32Array(quads * (rowLength - 1) * 6);
+    let n = 0;
+    for (let j = 0; j < quads; j++) {
+      for (let i = 0; i < rowLength - 1; i++) {
+        const a = j * rowLength + i;
+        const b = a + rowLength;
+        indices[n++] = a;
+        indices[n++] = a + 1;
+        indices[n++] = b;
+        indices[n++] = b;
+        indices[n++] = a + 1;
+        indices[n++] = b + 1;
+      }
+    }
+    return {
+      positions,
+      uvs,
+      occlusion,
+      indices,
+      rowLength,
+      rows: total,
+      cutCenter: [cx, cy, cz],
+      cutRadius,
+    };
+  }
+
+  return { base: piece(0, cutRow, true), top: piece(cutRow, rows - 1, false) };
+}

@@ -1,5 +1,7 @@
-// The floating Cuppy cup. Loaded on demand by CuppyStage, never in the main
-// bundle. Everything here is procedural: no model files or brand artwork.
+// The Cuppy cup, spoon and stretch. Loaded on demand by CuppyStage, never in
+// the main bundle. Everything here is procedural: no model files or brand
+// artwork. Positions come from choreography.ts; this module only builds the
+// meshes and applies a frame.
 
 import {
   BackSide,
@@ -9,10 +11,14 @@ import {
   CatmullRomCurve3,
   Color,
   DirectionalLight,
+  DoubleSide,
+  DynamicDrawUsage,
+  Euler,
   Group,
   HemisphereLight,
   LatheGeometry,
   Material,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshPhysicalMaterial,
@@ -22,6 +28,7 @@ import {
   PerspectiveCamera,
   PlaneGeometry,
   PMREMGenerator,
+  Quaternion,
   RepeatWrapping,
   Scene,
   SRGBColorSpace,
@@ -33,12 +40,37 @@ import {
 } from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 
+import {
+  beatsFor,
+  CAMERA_FOV,
+  choreograph,
+  BEND_SPRING,
+  cradlePose,
+  cupViewportBox,
+  PRODUCT,
+  projectToViewport,
+  TUG_SPRING,
+  stepSpring,
+  SWIRL_CUT_V,
+  type Spring,
+  type Choreography,
+  type StageMetrics,
+} from "./choreography";
 import type { Flavor } from "./flavors";
-import { buildSwirl, weldSeamNormals } from "./swirl";
+import { buildBowl, buildHandle, SPOON } from "./spoon";
+import { createStrandBuffers, writeStrand, type StrandInput } from "./strand";
+import { buildSwirl, splitSwirl, weldSeamNormals, type SwirlPiece } from "./swirl";
 
 export type CuppySceneOptions = {
   flavor: Flavor;
   animate: boolean;
+  /**
+   * "scroll": a fixed, viewport-sized stage that plays the scoop and stretch
+   * from the page scroll. "still": a single composed pose inside the hero slot.
+   */
+  mode: "scroll" | "still";
+  /** The hero slot the cup opens in. */
+  slot: HTMLElement;
   /** CSS font-family list for the printed label. */
   fontFamily: string;
   onContextLost: () => void;
@@ -53,13 +85,17 @@ export type CuppyScene = {
 
 const INK = "#17131A";
 const PAPER = "#F2E6D2";
-const CUP_TOP = 1.2;
+const CUP_TOP = PRODUCT.cupTop;
 const CUP_BOTTOM_RADIUS = 0.745;
 const CUP_TOP_RADIUS = 1;
-const SWIRL_HEIGHT = 1.95;
-const PRODUCT_HEIGHT = CUP_TOP + SWIRL_HEIGHT;
-const GROUND_Y = -PRODUCT_HEIGHT / 2 - 0.6;
+/** The product turns about a point this far above its foot. */
+const FLOAT_PIVOT = 1.5;
+/** The ground line sits this fraction of the slot's height above its bottom. */
+const SLOT_GROUND = 0.07;
 const MAX_PIXEL_RATIO = 1.75;
+/** The scroll stage covers the viewport, so it gets a lower ratio and a pixel budget. */
+const MAX_PIXEL_RATIO_FULL = 1.5;
+const MAX_PIXELS = 3_400_000;
 
 function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
   const waist = size * 0.22;
@@ -265,6 +301,25 @@ function makeDrip(length: number, material: Material) {
   return mesh;
 }
 
+function geometryFromPiece(piece: SwirlPiece) {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new BufferAttribute(piece.positions, 3));
+  geometry.setAttribute("uv", new BufferAttribute(piece.uvs, 2));
+  const colors = new Float32Array(piece.occlusion.length * 3);
+  piece.occlusion.forEach((value, i) => {
+    colors[i * 3] = colors[i * 3 + 1] = colors[i * 3 + 2] = value;
+  });
+  geometry.setAttribute("color", new BufferAttribute(colors, 3));
+  geometry.setIndex(new BufferAttribute(piece.indices, 1));
+  geometry.computeVertexNormals();
+  weldSeamNormals(
+    geometry.getAttribute("normal").array as Float32Array,
+    piece.rowLength,
+    piece.rows,
+  );
+  return geometry;
+}
+
 export async function createCuppyScene(
   container: HTMLElement,
   options: CuppySceneOptions,
@@ -278,6 +333,9 @@ export async function createCuppyScene(
   } catch {
     // The label still draws with whatever face is available.
   }
+
+  const scrollMode = options.mode === "scroll";
+  const slot = options.slot;
 
   const canvas = document.createElement("canvas");
   canvas.className = "cuppy-canvas";
@@ -304,25 +362,25 @@ export async function createCuppyScene(
   scene.environment = environment;
   scene.environmentIntensity = 0.55;
 
-  const camera = new PerspectiveCamera(26, 1, 0.1, 60);
+  const camera = new PerspectiveCamera(CAMERA_FOV, 1, 0.1, 600);
 
   // Light: warm window key from the upper left, lavender bounce from the page.
+  // The key and its shadow follow the cup wherever the scroll takes it.
   const key = new DirectionalLight("#FFF1DE", 3);
-  key.position.set(-3.2, 6, 5);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
   key.shadow.radius = 5;
   key.shadow.bias = -0.0004;
   key.shadow.normalBias = 0.025;
   const shadowCamera = key.shadow.camera;
-  shadowCamera.left = shadowCamera.bottom = -2.4;
-  shadowCamera.right = shadowCamera.top = 2.4;
+  shadowCamera.left = shadowCamera.bottom = -2.6;
+  shadowCamera.right = shadowCamera.top = 2.6;
   shadowCamera.near = 1;
-  shadowCamera.far = 16;
+  shadowCamera.far = 18;
   const rim = new DirectionalLight("#EBD2FF", 1.5);
   rim.position.set(4, 2.5, -4.5);
   const fill = new HemisphereLight("#FFF8EE", "#B98ABB", 0.55);
-  scene.add(key, rim, fill);
+  scene.add(key, key.target, rim, fill);
 
   const textures: Texture[] = [];
   const label = new CanvasTexture(drawLabel(family));
@@ -331,9 +389,11 @@ export async function createCuppyScene(
   const bump = new CanvasTexture(noiseTexture());
   bump.wrapS = bump.wrapT = RepeatWrapping;
   bump.repeat.set(5, 3);
+  const strandBump = bump.clone();
+  strandBump.repeat.set(2, 1);
   const shadowMap = new CanvasTexture(shadowTexture());
   shadowMap.colorSpace = SRGBColorSpace;
-  textures.push(label, bump, shadowMap);
+  textures.push(label, bump, strandBump, shadowMap);
 
   const paper = new MeshStandardMaterial({ map: label, roughness: 0.74, metalness: 0 });
   const paperPlain = new MeshStandardMaterial({ color: "#E9D8BC", roughness: 0.8 });
@@ -357,6 +417,19 @@ export async function createCuppyScene(
   });
   const dripCream = cream.clone();
   dripCream.vertexColors = false;
+  const strandCream = dripCream.clone();
+  strandCream.bumpMap = strandBump;
+  strandCream.bumpScale = 0.12;
+  // Glossy ink plastic: the darkest thing on the page, so the spoon and the
+  // point where the cream leaves it always read.
+  const spoonPlastic = new MeshPhysicalMaterial({
+    color: "#231C27",
+    roughness: 0.3,
+    metalness: 0,
+    clearcoat: 1,
+    clearcoatRoughness: 0.1,
+    side: DoubleSide,
+  });
   const shadowSoft = new MeshBasicMaterial({
     map: shadowMap,
     transparent: true,
@@ -373,6 +446,8 @@ export async function createCuppyScene(
     rimPaper,
     cream,
     dripCream,
+    strandCream,
+    spoonPlastic,
     shadowSoft,
     shadowCore,
   ];
@@ -412,26 +487,25 @@ export async function createCuppyScene(
     mesh.receiveShadow = true;
   }
 
-  // Swirl, pivoting at its base so flavor changes can squash it.
-  const swirlData = buildSwirl({ height: SWIRL_HEIGHT });
-  const swirlGeometry = new BufferGeometry();
-  swirlGeometry.setAttribute("position", new BufferAttribute(swirlData.positions, 3));
-  swirlGeometry.setAttribute("uv", new BufferAttribute(swirlData.uvs, 2));
-  const colors = new Float32Array(swirlData.occlusion.length * 3);
-  swirlData.occlusion.forEach((value, i) => {
-    colors[i * 3] = colors[i * 3 + 1] = colors[i * 3 + 2] = value;
-  });
-  swirlGeometry.setAttribute("color", new BufferAttribute(colors, 3));
-  swirlGeometry.setIndex(new BufferAttribute(swirlData.indices, 1));
-  swirlGeometry.computeVertexNormals();
-  const normal = swirlGeometry.getAttribute("normal");
-  weldSeamNormals(normal.array as Float32Array, swirlData.rowLength, swirlData.rows);
-  const swirl = new Mesh(swirlGeometry, cream);
-  swirl.castShadow = true;
-  swirl.receiveShadow = true;
+  // Swirl, split where the spoon takes it. The base pivots at the cup so a
+  // flavor change can squash it; the top is placed by hand every frame.
+  const swirlData = buildSwirl({ height: PRODUCT.swirlHeight });
+  const pieces = splitSwirl(swirlData, SWIRL_CUT_V);
+  const cutCenter = new Vector3(...pieces.base.cutCenter);
+  const cutRadius = pieces.base.cutRadius;
+  const base = new Mesh(geometryFromPiece(pieces.base), cream);
+  base.castShadow = true;
+  base.receiveShadow = true;
   const swirlPivot = new Group();
-  swirlPivot.position.y = CUP_TOP - 0.06;
-  swirlPivot.add(swirl);
+  swirlPivot.position.y = PRODUCT.swirlBase;
+  swirlPivot.add(base);
+
+  const topGeometry = geometryFromPiece(pieces.top);
+  topGeometry.translate(-cutCenter.x, -cutCenter.y, -cutCenter.z);
+  const dollop = new Mesh(topGeometry, cream);
+  dollop.castShadow = true;
+  dollop.receiveShadow = true;
+  dollop.matrixAutoUpdate = false;
 
   const drips = new Group();
   for (const [angle, length] of [
@@ -445,157 +519,407 @@ export async function createCuppyScene(
     drips.add(holder);
   }
 
+  // cupRoot sits on the ground line; float hovers and turns the product
+  // around its middle.
   const product = new Group();
   product.add(outerWall, innerWall, foot, rimRoll, swirlPivot, drips);
-  product.position.y = -PRODUCT_HEIGHT / 2;
+  product.position.y = -FLOAT_PIVOT;
   const float = new Group();
+  float.position.y = PRODUCT.float + FLOAT_PIVOT;
   float.add(product);
-  scene.add(float);
+  const cupRoot = new Group();
+  cupRoot.add(float);
 
   const shadowPlane = new PlaneGeometry(1, 1);
   const softShadow = new Mesh(shadowPlane, shadowSoft);
   softShadow.rotation.x = -Math.PI / 2;
-  softShadow.position.y = GROUND_Y;
   const coreShadow = new Mesh(shadowPlane, shadowCore);
   coreShadow.rotation.x = -Math.PI / 2;
-  coreShadow.position.y = GROUND_Y + 0.001;
-  scene.add(softShadow, coreShadow);
+  coreShadow.position.y = 0.001;
+  cupRoot.add(softShadow, coreShadow);
+
+  const spoon = new Group();
+  spoon.rotation.order = "YXZ";
+  for (const geometry of [buildBowl(), buildHandle()]) {
+    const mesh = new Mesh(geometry, spoonPlastic);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    spoon.add(mesh);
+  }
+
+  // The stretched strand: fixed-size buffers rewritten in place.
+  const strandBuffers = createStrandBuffers();
+  const strandGeometry = new BufferGeometry();
+  const strandPosition = new BufferAttribute(strandBuffers.positions, 3).setUsage(DynamicDrawUsage);
+  const strandNormal = new BufferAttribute(strandBuffers.normals, 3).setUsage(DynamicDrawUsage);
+  const strandUv = new BufferAttribute(strandBuffers.uvs, 2).setUsage(DynamicDrawUsage);
+  strandGeometry.setAttribute("position", strandPosition);
+  strandGeometry.setAttribute("normal", strandNormal);
+  strandGeometry.setAttribute("uv", strandUv);
+  strandGeometry.setIndex(new BufferAttribute(strandBuffers.indices, 1));
+  const strand = new Mesh(strandGeometry, strandCream);
+  strand.frustumCulled = false;
+  strand.castShadow = true;
+  strand.receiveShadow = true;
+  strand.visible = false;
+
+  scene.add(cupRoot, spoon, dollop, strand);
+
+  // Where the top sits in the bowl: exactly where it was on the swirl at the
+  // moment the spoon cradles it, so the hand-over cannot jump.
+  const cradle = cradlePose();
+  const restTop = new Matrix4().makeTranslation(
+    cutCenter.x,
+    cutCenter.y + PRODUCT.float + PRODUCT.swirlBase,
+    cutCenter.z,
+  );
+  const cradleSpoon = new Matrix4().compose(
+    new Vector3(cradle.x, cradle.y, cradle.z),
+    new Quaternion().setFromEuler(new Euler(cradle.rx, cradle.ry, cradle.rz, "YXZ")),
+    new Vector3(1, 1, 1),
+  );
+  const seat = cradleSpoon.clone().invert().multiply(restTop);
+  const cutOffset = new Matrix4().makeTranslation(cutCenter.x, cutCenter.y, cutCenter.z);
 
   // State
   let animate = options.animate;
-  let inView = true;
   let pageVisible = document.visibilityState === "visible";
-  let frame = 0;
+  let frameId = 0;
   let elapsed = 0;
   let last = 0;
   let disposed = false;
+  let metrics: StageMetrics | null = null;
+  let visibleHeight = 0;
+  let lastScroll = scrollMode ? window.scrollY : 0;
+  let scrollVelocity = 0;
   const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
+  const bend: Spring = { value: 0, velocity: 0 };
+  const tug: Spring = { value: 0, velocity: 0 };
   const fromColor = new Color(options.flavor.cream);
   const toColor = new Color(options.flavor.cream);
   const fromSheen = new Color(options.flavor.sheen);
   const toSheen = new Color(options.flavor.sheen);
   let blend = 1;
   let squash = 1;
+  let reported = "";
 
-  function frameCamera() {
+  const tmp = {
+    a: new Vector3(),
+    b: new Vector3(),
+    c: new Vector3(),
+  };
+  /** Document y where the ink close begins; the contact shadow fades out over it. */
+  let darkTop = Infinity;
+  let shadowFade = 1;
+  const strandInput: StrandInput = {
+    bottom: { x: 0, y: 0, z: 0 },
+    bottomDir: { x: 0, y: 1, z: 0 },
+    top: { x: 0, y: 0, z: 0 },
+    topDir: { x: 0, y: -1, z: 0 },
+    bottomRadius: cutRadius * 0.8,
+    topRadius: cutRadius * 0.74,
+    neckRadius: cutRadius * 0.64,
+    minRadius: 0.12,
+    visibleTop: 0,
+    time: 0,
+    sway: 0,
+    bend: 0,
+    progress: 0,
+  };
+
+  function targetVisibleHeight() {
+    return scrollMode
+      ? (window.visualViewport?.height ?? window.innerHeight)
+      : container.clientHeight;
+  }
+
+  function measure() {
     const width = container.clientWidth || 1;
     const height = container.clientHeight || 1;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
+    let hero: StageMetrics["hero"];
+    let maxScroll = 0;
+    if (scrollMode) {
+      const rect = slot.getBoundingClientRect();
+      const top = rect.top + window.scrollY;
+      hero = {
+        x: rect.left + rect.width / 2,
+        groundY: top + rect.height * (1 - SLOT_GROUND),
+        productPx: fitProduct(rect.width, rect.height),
+      };
+      maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const dark = document.querySelector("[data-cuppy-dark]");
+      darkTop = dark ? dark.getBoundingClientRect().top + window.scrollY : Infinity;
+    } else {
+      // The still pose needs headroom for the lifted spoon inside the slot.
+      hero = {
+        x: width / 2,
+        groundY: height * (1 - SLOT_GROUND),
+        productPx: fitProduct(width, height) * 0.8,
+      };
+      maxScroll = height * 4;
+    }
+    if (!visibleHeight) visibleHeight = targetVisibleHeight();
+    metrics = {
+      width,
+      height,
+      visibleHeight,
+      maxScroll,
+      hero,
+      layout: !scrollMode || width >= 960 ? "wide" : "narrow",
+    };
+    const ratio = Math.min(
+      window.devicePixelRatio || 1,
+      scrollMode ? MAX_PIXEL_RATIO_FULL : MAX_PIXEL_RATIO,
+      Math.sqrt(MAX_PIXELS / (width * height)),
+    );
+    renderer.setPixelRatio(Math.max(1, ratio));
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
-    // Fit the product to ~72% of the height, or 78% of the width on narrow
-    // stages, and keep the ground line near the bottom where the word sits.
-    const fov = (camera.fov * Math.PI) / 180;
-    const fitHeight = PRODUCT_HEIGHT / 0.72;
-    const fitWidth = 2.3 / 0.78 / camera.aspect;
-    const viewHeight = Math.max(fitHeight, fitWidth);
-    const distance = viewHeight / 2 / Math.tan(fov / 2);
-    const target = GROUND_Y + viewHeight * 0.4;
-    camera.position.set(0, target + 0.9, distance);
-    camera.lookAt(0, target, 0);
     camera.updateProjectionMatrix();
   }
 
+  /** The still pose: the top just lifted, a short pull of cream under the spoon. */
+  function stillScroll(m: StageMetrics) {
+    const beats = beatsFor(m.height);
+    return beats.cradle + (beats.anchor - beats.cradle) * 0.7;
+  }
+
+  /** Advances one frame; returns whether another frame is needed. */
   function update(dt: number) {
-    elapsed += dt;
+    if (!metrics) measure();
+    const m = metrics as StageMetrics;
+    let moving = false;
+
+    // Visible height eases, so a mobile toolbar sliding away never jolts the cup.
+    const targetHeight = targetVisibleHeight();
+    if (Math.abs(targetHeight - visibleHeight) > 0.5) {
+      visibleHeight += (targetHeight - visibleHeight) * (1 - Math.exp(-dt * 12));
+      moving = true;
+    } else visibleHeight = targetHeight;
+    m.visibleHeight = visibleHeight;
+
+    const scrollY = scrollMode ? window.scrollY : stillScroll(m);
+    if (dt > 0) {
+      const instant = (scrollY - lastScroll) / dt;
+      scrollVelocity += (instant - scrollVelocity) * (1 - Math.exp(-dt * 14));
+    }
+    lastScroll = scrollY;
+    if (Math.abs(scrollVelocity) > 1) moving = true;
+    else scrollVelocity = 0;
+
+    const frame = choreograph(scrollY, m);
+    if (animate) elapsed += dt;
     const t = elapsed;
     const ease = 1 - Math.exp(-dt * 4);
     pointer.x += (pointer.tx - pointer.x) * ease;
     pointer.y += (pointer.ty - pointer.y) * ease;
 
-    const bob = Math.sin(t * 1.15) * 0.085;
-    float.position.y = bob;
-    float.rotation.y = Math.sin(t * 0.36) * 0.42 + pointer.x * 0.45;
-    float.rotation.x = pointer.y * 0.16 + Math.sin(t * 0.8) * 0.025;
-    float.rotation.z = -pointer.x * 0.07 + Math.sin(t * 0.6) * 0.03;
-    placeShadow(bob);
+    // Scroll springs: the strand bows while the page moves and wobbles when it
+    // stops; a fast pull tugs the cup up a little against the cream.
+    const springs = animate && scrollMode;
+    const holding = frame.holding;
+    const bendTarget = springs && holding ? clampValue(scrollVelocity * 0.00022, -0.5, 0.5) : 0;
+    const tugTarget =
+      springs && holding
+        ? clampValue(-scrollVelocity * 0.012, -m.height * 0.03, m.height * 0.03)
+        : 0;
+    if (springs) {
+      if (stepSpring(bend, bendTarget, dt, BEND_SPRING)) moving = true;
+      if (stepSpring(tug, tugTarget, dt, TUG_SPRING)) moving = true;
+    } else {
+      bend.value = bend.velocity = tug.value = tug.velocity = 0;
+    }
+
+    const sway = frame.sway;
+    const bob = animate ? Math.sin(t * 1.15) * 0.085 : 0;
+    const turn = animate ? Math.sin(t * 0.36) * 0.42 + pointer.x * 0.45 : 0.18;
+    const unitPerPx = (frame.cameraDistance - frame.cup.z) / frame.cameraDistance / frame.ppu;
+    cupRoot.position.set(frame.cup.x, frame.cup.y - tug.value * unitPerPx, frame.cup.z);
+    float.position.y = PRODUCT.float + FLOAT_PIVOT + bob * sway;
+    float.rotation.y = turn * sway;
+    float.rotation.x = (animate ? pointer.y * 0.16 + Math.sin(t * 0.8) * 0.025 : 0.02) * sway;
+    float.rotation.z =
+      (animate ? -pointer.x * 0.07 + Math.sin(t * 0.6) * 0.03 : 0) * sway - bend.value * 0.05;
+    // A plum shadow on ink only bands, so it fades as the cup reaches the close.
+    const groundDocY = scrollY + projectToViewport(frame.cup, frame, m).y;
+    shadowFade = 1 - smoothstep01((groundDocY - darkTop + 60) / 220);
+    placeShadow(animate ? (bob * sway) / 0.085 : 0);
+
+    spoon.position.set(frame.spoon.x, frame.spoon.y, frame.spoon.z);
+    spoon.rotation.set(frame.spoon.rx, frame.spoon.ry, frame.spoon.rz - bend.value * 0.04, "YXZ");
 
     if (blend < 1) {
       blend = Math.min(1, blend + dt / 0.5);
       applyColor(1 - Math.pow(1 - blend, 3));
+      moving = true;
     }
-    if (squash < 1) {
+    // The swirl left in the cup gives up cream to the strand as it lengthens.
+    const drain = holding ? frame.stretch : 0;
+    const keepWide = 1 - 0.07 * drain;
+    const keepTall = 1 - 0.2 * drain;
+    if (squash < 1 && animate) {
       squash = Math.min(1, squash + dt / 1.1);
       const s = squash * 1.1;
       const wobble = Math.exp(-s * 5) * Math.cos(s * 13);
-      swirlPivot.scale.set(1 + wobble * 0.06, 1 - wobble * 0.09, 1 + wobble * 0.06);
+      swirlPivot.scale.set(
+        (1 + wobble * 0.06) * keepWide,
+        (1 - wobble * 0.09) * keepTall,
+        (1 + wobble * 0.06) * keepWide,
+      );
+      moving = true;
     } else {
-      swirlPivot.scale.set(1, 1, 1);
+      squash = 1;
+      swirlPivot.scale.set(keepWide, keepTall, keepWide);
     }
+
+    cupRoot.updateMatrixWorld(true);
+    spoon.updateMatrixWorld(true);
+    if (holding) dollop.matrix.multiplyMatrices(spoon.matrixWorld, seat);
+    else dollop.matrix.multiplyMatrices(swirlPivot.matrixWorld, cutOffset);
+    dollop.matrixWorld.copy(dollop.matrix);
+
+    key.target.position.set(frame.cup.x, frame.cup.y + 1.6, frame.cup.z);
+    key.position.set(frame.cup.x - 3.2, frame.cup.y + 7.6, frame.cup.z + 5);
+
+    strand.visible = holding;
+    if (holding) {
+      const pivot = swirlPivot.matrixWorld;
+      tmp.a.set(cutCenter.x, cutCenter.y - 0.08, cutCenter.z).applyMatrix4(pivot);
+      strandInput.bottom.x = tmp.a.x;
+      strandInput.bottom.y = tmp.a.y;
+      strandInput.bottom.z = tmp.a.z;
+      tmp.b.setFromMatrixColumn(pivot, 1).normalize();
+      strandInput.bottomDir.x = tmp.b.x;
+      strandInput.bottomDir.y = tmp.b.y;
+      strandInput.bottomDir.z = tmp.b.z;
+      // The strand hangs from where the cream spills over the bowl's tip.
+      // Until the spoon has the top, it comes straight out of the top's cut.
+      const { cradle: from, anchor: to } = frame.beats;
+      const tipLip = smoothstep01((scrollY - from) / (to - from));
+      tmp.a.set(0, 0.08, 0).applyMatrix4(dollop.matrix);
+      tmp.b.set(-SPOON.tipLength * 0.72, -0.03, 0).applyMatrix4(spoon.matrixWorld);
+      tmp.a.lerp(tmp.b, tipLip);
+      strandInput.top.x = tmp.a.x;
+      strandInput.top.y = tmp.a.y;
+      strandInput.top.z = tmp.a.z;
+      tmp.b.setFromMatrixColumn(dollop.matrix, 1).normalize().negate();
+      tmp.c.setFromMatrixColumn(spoon.matrixWorld, 0).normalize().negate();
+      tmp.b.addScaledVector(tmp.c, 0.6 * tipLip);
+      tmp.b.y -= 0.6;
+      tmp.b.normalize();
+      strandInput.topDir.x = tmp.b.x;
+      strandInput.topDir.y = tmp.b.y;
+      strandInput.topDir.z = tmp.b.z;
+      strandInput.bottomRadius = cutRadius * 0.8 * swirlPivot.scale.x;
+      strandInput.visibleTop =
+        frame.cameraY +
+        (m.height / 2) * ((frame.cameraDistance - frame.cup.z) / frame.cameraDistance / frame.ppu) +
+        0.6;
+      strandInput.time = t;
+      strandInput.sway = animate ? 1 : 0;
+      strandInput.bend = bend.value;
+      strandInput.progress = frame.stretch;
+      // The narrow cup sits deeper, so its units are smaller on screen.
+      strandInput.wobbleScale = m.layout === "wide" ? 1 : 1 / Math.max(frame.cupScale, 0.4);
+      strandInput.rippleScale = m.layout === "wide" ? 1 : 0.45;
+      writeStrand(strandBuffers, strandInput);
+      strandPosition.needsUpdate = true;
+      strandNormal.needsUpdate = true;
+      strandUv.needsUpdate = true;
+    }
+
+    camera.position.set(0, frame.cameraY, frame.cameraDistance);
+    report(frame, m);
+    return moving || animate;
+  }
+
+  // Progress is published on the host for tests and debugging. A replaced
+  // scene (Strict Mode, context restore) must not clear its successor's.
+  const owner = String((sceneCount += 1));
+
+  function report(frame: Choreography, m: StageMetrics) {
+    const phase = !frame.holding
+      ? frame.scoop > 0
+        ? "scoop"
+        : "rest"
+      : frame.anchored
+        ? "stretch"
+        : "lift";
+    const box = cupViewportBox(frame, m);
+    const next = `${phase}|${frame.stretch.toFixed(2)}|${Math.round(box.top)}|${Math.round(box.bottom)}`;
+    if (next === reported && container.dataset.sceneOwner === owner) return;
+    reported = next;
+    container.dataset.sceneOwner = owner;
+    container.dataset.phase = phase;
+    container.dataset.stretch = frame.stretch.toFixed(2);
+    container.dataset.cupTop = String(Math.round(box.top));
+    container.dataset.cupBottom = String(Math.round(box.bottom));
   }
 
   function placeShadow(height: number) {
-    const lift = height / 0.085;
+    const lift = height;
     softShadow.scale.set(3.1 - lift * 0.18, 3.1 - lift * 0.18, 1);
-    shadowSoft.opacity = 0.42 - lift * 0.06;
+    shadowSoft.opacity = (0.42 - lift * 0.06) * shadowFade;
     coreShadow.scale.set(1.7 - lift * 0.14, 1.7 - lift * 0.14, 1);
-    shadowCore.opacity = 0.42 - lift * 0.1;
+    shadowCore.opacity = (0.42 - lift * 0.1) * shadowFade;
+    softShadow.visible = coreShadow.visible = shadowFade > 0.01;
   }
 
   function applyColor(amount: number) {
     cream.color.lerpColors(fromColor, toColor, amount);
     cream.sheenColor.lerpColors(fromSheen, toSheen, amount);
-    dripCream.color.copy(cream.color);
-    dripCream.sheenColor.copy(cream.sheenColor);
-  }
-
-  function render() {
-    renderer.render(scene, camera);
+    for (const material of [dripCream, strandCream]) {
+      material.color.copy(cream.color);
+      material.sheenColor.copy(cream.sheenColor);
+    }
   }
 
   function tick(now: number) {
-    frame = 0;
+    frameId = 0;
     if (disposed) return;
     const dt = last ? Math.min((now - last) / 1000, 1 / 20) : 0;
     last = now;
-    update(dt);
-    render();
-    schedule();
+    const more = update(dt);
+    renderer.render(scene, camera);
+    if (more) request();
+    else last = 0;
   }
 
-  function running() {
-    return animate && inView && pageVisible && !disposed;
-  }
-
-  function schedule() {
-    if (frame || !running()) return;
-    frame = requestAnimationFrame(tick);
+  function request() {
+    if (frameId || disposed || !pageVisible) return;
+    frameId = requestAnimationFrame(tick);
   }
 
   function stop() {
-    if (frame) cancelAnimationFrame(frame);
-    frame = 0;
+    if (frameId) cancelAnimationFrame(frameId);
+    frameId = 0;
     last = 0;
   }
 
-  function settleStill() {
-    // A composed resting pose for reduced motion and paused motion.
-    pointer.x = pointer.tx = 0;
-    pointer.y = pointer.ty = 0;
-    float.position.y = 0;
-    float.rotation.set(0.02, 0.18, 0);
-    swirlPivot.scale.set(1, 1, 1);
-    squash = 1;
-    if (blend < 1) {
-      blend = 1;
-      applyColor(1);
-    }
-    placeShadow(0);
-    render();
+  function renderNow() {
+    update(0);
+    renderer.render(scene, camera);
   }
 
   function onPointerMove(event: PointerEvent) {
-    if (!running()) return;
-    const rect = container.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    const y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
-    pointer.tx = Math.max(-1, Math.min(1, x));
-    pointer.ty = Math.max(-1, Math.min(1, y));
+    if (!animate) return;
+    pointer.tx = clampValue((event.clientX / window.innerWidth) * 2 - 1, -1, 1);
+    pointer.ty = clampValue((event.clientY / window.innerHeight) * 2 - 1, -1, 1);
+    request();
+  }
+
+  function onScroll() {
+    request();
+  }
+
+  function onResize() {
+    measure();
+    request();
   }
 
   function onVisibility() {
     pageVisible = document.visibilityState === "visible";
-    if (running()) schedule();
+    if (pageVisible) request();
     else stop();
   }
 
@@ -605,23 +929,24 @@ export async function createCuppyScene(
     options.onContextLost();
   }
 
-  const resizeObserver = new ResizeObserver(() => {
-    frameCamera();
-    if (!running()) render();
-  });
+  // Layout changes (fonts, flavor copy, viewport) move the hero slot and the
+  // page length, so remeasure whenever the stage, slot or document resizes.
+  const resizeObserver = new ResizeObserver(onResize);
   resizeObserver.observe(container);
+  if (scrollMode) {
+    resizeObserver.observe(slot);
+    resizeObserver.observe(document.body);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.visualViewport?.addEventListener("resize", onScroll);
+  }
+  window.addEventListener("resize", onResize);
   window.addEventListener("pointermove", onPointerMove, { passive: true });
   document.addEventListener("visibilitychange", onVisibility);
   canvas.addEventListener("webglcontextlost", onContextLost);
 
-  frameCamera();
-  if (animate) {
-    float.rotation.y = 0;
-    render();
-    schedule();
-  } else {
-    settleStill();
-  }
+  measure();
+  renderNow();
+  request();
 
   return {
     setFlavor(flavor) {
@@ -629,33 +954,35 @@ export async function createCuppyScene(
       fromSheen.copy(cream.sheenColor);
       toColor.set(flavor.cream);
       toSheen.set(flavor.sheen);
-      if (running()) {
+      if (animate && pageVisible) {
         blend = 0;
         squash = 0;
-        schedule();
+        request();
       } else {
         blend = 1;
         applyColor(1);
-        render();
+        renderNow();
       }
     },
     setAnimate(next) {
       animate = next;
-      if (running()) schedule();
-      else {
-        stop();
-        settleStill();
+      if (!next) {
+        pointer.x = pointer.tx = pointer.y = pointer.ty = 0;
+        renderNow();
       }
+      request();
     },
-    setInView(next) {
-      inView = next;
-      if (running()) schedule();
-      else stop();
+    setInView() {
+      // The scroll stage is always in view; the still stage renders on demand.
+      request();
     },
     dispose() {
       disposed = true;
       stop();
       resizeObserver.disconnect();
+      window.removeEventListener("scroll", onScroll);
+      window.visualViewport?.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
       window.removeEventListener("pointermove", onPointerMove);
       document.removeEventListener("visibilitychange", onVisibility);
       canvas.removeEventListener("webglcontextlost", onContextLost);
@@ -669,6 +996,28 @@ export async function createCuppyScene(
       renderer.dispose();
       renderer.forceContextLoss();
       canvas.remove();
+      if (container.dataset.sceneOwner === owner) {
+        for (const key of ["sceneOwner", "phase", "stretch", "cupTop", "cupBottom"]) {
+          delete container.dataset[key];
+        }
+      }
     },
   };
+}
+
+let sceneCount = 0;
+
+function smoothstep01(x: number) {
+  const t = Math.min(1, Math.max(0, x));
+  return t * t * (3 - 2 * t);
+}
+
+function clampValue(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+/** Product height in px that fits a slot: 80% of its height, or its width for the cup. */
+function fitProduct(width: number, height: number) {
+  const total = PRODUCT.height + PRODUCT.float;
+  return Math.min(height * 0.8, ((width * 0.84) / PRODUCT.width) * total);
 }

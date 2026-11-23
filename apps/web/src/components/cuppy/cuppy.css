@@ -14,6 +14,9 @@
   --cuppy-word-size: calc((100vw - 2 * var(--cuppy-pad)) / 8.36);
   --cuppy-lead-size: clamp(1.75rem, 5.4vw, 5.25rem);
   --cuppy-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* The centre lane stays clear for the cup and the strand. */
+  --cuppy-lane: clamp(17rem, 27vw, 27rem);
+  --cuppy-gutter: clamp(1rem, 3vw, 3rem);
   color-scheme: light;
 }
 
@@ -293,6 +296,13 @@ html {
   width: min(23rem, calc(50% - min(23vw, 37svh, 22rem) - var(--cuppy-pad) - 1rem));
 }
 
+/* On wide screens the hero pill may run past the narrow pitch column; there is
+   open lavender beside it. Narrow columns wrap it instead. */
+.cuppy-pitch .cuppy-button {
+  max-width: none;
+  white-space: nowrap;
+}
+
 .cuppy-pitch p {
   font-size: clamp(1rem, 1.25vw, 1.1875rem);
   line-height: 1.5;
@@ -314,7 +324,10 @@ html {
   letter-spacing: 0.04em;
   text-decoration: none;
   text-transform: uppercase;
-  white-space: nowrap;
+  /* The handle can't break, so a narrow column wraps the pill at its one space. */
+  max-width: 100%;
+  padding-block: 0.7rem;
+  line-height: 1.15;
   box-shadow: 0 10px 24px -14px rgb(23 19 26 / 0.7);
   transition:
     transform 0.25s var(--cuppy-ease-out),
@@ -408,6 +421,7 @@ html {
 
 .cuppy-chip-name {
   position: relative;
+  max-width: 100%;
   margin-top: 0.9rem;
   padding: 0 1.25rem;
   font-size: 0.8125rem;
@@ -456,89 +470,217 @@ html {
   border-radius: 12px;
 }
 
-/* ---------- Flavor band: the page takes the chosen flavor's color ---------- */
+/* ---------- Scroll scene: one fixed layer over the page ---------- */
 
-.cuppy-flavor {
+/* The cup lives in viewport space and the spoon in document space, so the
+   scene draws into a single layer fixed to the viewport. 100lvh keeps the
+   canvas a stable size while mobile toolbars come and go. */
+.cuppy-scene {
+  position: fixed;
+  z-index: 6;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100lvh;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.cuppy[data-motion="scroll"][data-scene="live"] .cuppy-scene {
+  visibility: visible;
+}
+
+/* ---------- The pull: chapters beside the stretch ---------- */
+
+.cuppy-pull,
+.cuppy-close,
+.cuppy-footer {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  align-items: end;
-  gap: clamp(2rem, 5vw, 5rem);
-  padding: clamp(4rem, 9vw, 7.5rem) var(--cuppy-pad);
+  grid-template-columns: minmax(0, 1fr) var(--cuppy-lane) minmax(0, 1fr);
+  column-gap: var(--cuppy-gutter);
+  padding-inline: var(--cuppy-pad);
+}
+
+.cuppy-pull {
+  position: relative;
+  padding-bottom: 12svh;
+}
+
+.cuppy-ritual {
+  display: grid;
+  grid-row: 1;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  list-style: none;
+}
+
+.cuppy-beat {
+  display: grid;
+  align-content: center;
+  gap: 1.1rem;
+  min-height: 86svh;
+}
+
+/* One beat per row, alternating sides of the lane, so each line arrives on
+   its own while the strand keeps growing between them. */
+.cuppy-beat-dig {
+  grid-row: 1;
+  grid-column: 1;
+  align-content: start;
+  min-height: 62svh;
+  padding-top: clamp(2.5rem, 7svh, 5rem);
+}
+
+.cuppy-beat-lift {
+  grid-row: 2;
+  grid-column: 3;
+}
+
+.cuppy-beat-stretch {
+  grid-row: 3;
+  grid-column: 1;
+  min-height: 104svh;
+}
+
+.cuppy-beat-still {
+  grid-row: 3;
+  grid-column: 1;
+  min-height: 80svh;
+}
+
+.cuppy-beat-word {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.3em;
+  font-size: clamp(2.5rem, 5.4vw, 5.5rem);
+  font-weight: 900;
+  font-stretch: 125%;
+  letter-spacing: -0.03em;
+  line-height: 0.9;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.cuppy-beat-line {
+  max-width: 26ch;
+  font-size: clamp(1.0625rem, 1.5vw, 1.375rem);
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.cuppy-beat-sparkle {
+  flex: none;
+  width: 0.5em;
+  fill: currentColor;
+}
+
+/* Flavor panel: the chosen flavor's field, outlined like the cup chips. */
+.cuppy-flavor {
+  container-type: inline-size;
+  display: grid;
+  grid-row: 2;
+  grid-column: 3;
+  align-self: center;
+  justify-items: start;
+  gap: 1.25rem;
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  border: 3px solid var(--cuppy-ink);
+  border-radius: 28px;
   background: var(--flavor-field);
   color: var(--flavor-ink);
+  box-shadow: 0 22px 40px -28px rgb(58 34 64 / 0.6);
   transition:
     background-color 0.6s var(--cuppy-ease-out),
     color 0.6s var(--cuppy-ease-out);
 }
 
-.cuppy-flavor-copy {
-  display: grid;
-  gap: 1.5rem;
-}
-
 .cuppy-flavor h2 {
-  font-size: clamp(2.75rem, 8.4vw, 7.5rem);
+  /* "CHOCOLATE" is about 8.6em wide at this width axis; keep it inside the panel. */
+  font-size: clamp(1.25rem, 11cqi, 3.75rem);
   font-weight: 900;
   font-stretch: 125%;
   letter-spacing: -0.03em;
-  line-height: 0.88;
+  line-height: 0.9;
   text-transform: uppercase;
   text-wrap: balance;
 }
 
-.cuppy-flavor-copy p {
+.cuppy-flavor > p {
   max-width: 30ch;
-  font-size: clamp(1.125rem, 1.7vw, 1.5rem);
-  line-height: 1.4;
+  font-size: clamp(1.0625rem, 1.35vw, 1.25rem);
+  line-height: 1.45;
   text-wrap: pretty;
 }
 
-.cuppy-ritual {
-  display: grid;
-  gap: 0.2em;
-  font-size: clamp(1.75rem, 3.6vw, 3.25rem);
-  font-weight: 800;
-  font-stretch: 112%;
-  letter-spacing: -0.015em;
-  line-height: 1.05;
-  list-style: none;
-  text-transform: uppercase;
+.cuppy-flavors-compact {
+  position: static;
+  margin-top: 0.5rem;
 }
 
-.cuppy-ritual li {
-  display: flex;
-  align-items: center;
-  gap: 0.35em;
+.cuppy-flavors-compact legend {
+  color: inherit;
 }
 
-.cuppy-ritual li:nth-child(2) {
-  padding-left: 1.1em;
+.cuppy-flavors-compact .cuppy-flavor-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.cuppy-ritual li:nth-child(3) {
-  padding-left: 2.2em;
+.cuppy-flavors-compact .cuppy-chip {
+  width: 100%;
+  min-width: 0;
+  color: var(--chip-ink);
 }
 
-.cuppy-ritual-sparkle {
-  flex: none;
-  width: 0.6em;
-  fill: currentColor;
+.cuppy-flavors-compact .cuppy-chip-name {
+  padding: 0 0.5rem;
+  font-size: 0.6875rem;
+  font-stretch: 100%;
+}
+
+.cuppy-flavors-compact .cuppy-chip:has(input:checked) {
+  transform: translateY(-0.35rem) scale(1.04);
+}
+
+.cuppy[data-flavor="chocolate"] .cuppy-flavors-compact .cuppy-chip:has(input:focus-visible) {
+  outline-color: var(--cuppy-cream);
+}
+
+/* Without the scroll scene (reduced motion, or no WebGL) nothing travels
+   down the lane, so the chapters close up into a normal reading rhythm. */
+.cuppy:is([data-motion="still"], [data-scene="fallback"]) .cuppy-beat {
+  min-height: 0;
+  padding-block: clamp(3rem, 9vw, 6rem);
+}
+
+.cuppy:is([data-motion="still"], [data-scene="fallback"]) .cuppy-beat-lift {
+  padding-top: 0;
+}
+
+.cuppy:is([data-motion="still"], [data-scene="fallback"]) .cuppy-flavor {
+  margin-block: clamp(2rem, 6vw, 4rem);
+}
+
+.cuppy:is([data-motion="still"], [data-scene="fallback"]) .cuppy-close {
+  min-height: 0;
 }
 
 /* ---------- Close ---------- */
 
 .cuppy-close {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   align-items: end;
-  gap: clamp(2rem, 5vw, 5rem);
-  padding: clamp(4.5rem, 10vw, 8rem) var(--cuppy-pad) clamp(3rem, 6vw, 5rem);
+  row-gap: 2rem;
+  min-height: 78svh;
+  padding-top: clamp(4.5rem, 10vw, 8rem);
+  padding-bottom: clamp(3rem, 6vw, 5rem);
   background: var(--cuppy-ink);
   color: var(--cuppy-cream);
 }
 
 .cuppy-close h2 {
-  font-size: clamp(2.25rem, 5.6vw, 5.25rem);
+  grid-column: 1;
+  font-size: clamp(2.25rem, 4.6vw, 4.75rem);
   font-weight: 900;
   font-stretch: 125%;
   letter-spacing: -0.025em;
@@ -553,6 +695,7 @@ html {
 
 .cuppy-close-action {
   display: grid;
+  grid-column: 3;
   justify-items: start;
   gap: 1.5rem;
 }
@@ -563,14 +706,16 @@ html {
 }
 
 .cuppy-footer {
-  padding: 1.75rem var(--cuppy-pad) 2.5rem;
+  padding-top: 1.75rem;
+  padding-bottom: 2.5rem;
   border-top: 1px solid rgb(242 230 210 / 0.18);
   background: var(--cuppy-ink);
   color: rgb(242 230 210 / 0.74);
 }
 
 .cuppy-footer p {
-  max-width: 72ch;
+  grid-column: 1;
+  max-width: 60ch;
   margin: 0;
   font-size: 0.8125rem;
   line-height: 1.55;
@@ -581,6 +726,9 @@ html {
 @media (max-width: 959px) {
   :root {
     --cuppy-lead-size: clamp(1.75rem, 9.6vw, 4rem);
+    --cuppy-lane: 36vw;
+    --cuppy-gutter: 0.75rem;
+    --cuppy-spoon-room: 80lvh;
   }
 
   .cuppy-hero {
@@ -621,68 +769,96 @@ html {
     width: min(100vw, 34rem);
   }
 
+  /* Pinned to the cup's window, not the hero's height, which changes with the spoon room. */
   .cuppy-sparkle-a {
-    top: 26%;
+    top: calc(4rem + var(--cuppy-lead-size) * 2 + clamp(18rem, 50svh, 32rem) * 0.32);
     left: 8%;
   }
 
   .cuppy-sparkle-b {
-    top: 16%;
+    top: calc(4rem + var(--cuppy-lead-size) * 2 + clamp(18rem, 50svh, 32rem) * 0.08);
     left: auto;
     right: 12%;
   }
 
   .cuppy-sparkle-c {
-    top: 44%;
+    top: calc(4rem + var(--cuppy-lead-size) * 2 + clamp(18rem, 50svh, 32rem) * 0.72);
     left: auto;
-    right: 6%;
+    right: 5%;
   }
 
+  /* Under the word, room for the scoop: the cup stays put on screen while
+     this empty stretch of page passes beneath it, and the spoon is left
+     behind here. Pitch and chips follow in the left-hand column. */
   .cuppy-pitch,
-  .cuppy-flavors {
+  .cuppy-hero .cuppy-flavors {
     position: relative;
     inset: auto;
     width: auto;
+    min-width: 0;
+    max-width: calc(100% - var(--cuppy-lane) - var(--cuppy-gutter));
   }
 
-  .cuppy-flavors {
-    order: 3;
-    margin-top: 2rem;
+  .cuppy-pitch .cuppy-button {
+    max-width: 100%;
+    white-space: normal;
   }
 
-  .cuppy-flavors legend {
-    text-align: center;
-    width: 100%;
+  .cuppy-hero .cuppy-flavors {
+    order: 4;
+    margin-top: 2.5rem;
   }
 
-  .cuppy-flavor-options {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .cuppy-hero .cuppy-flavor-options {
     gap: 0.5rem;
+    max-width: 11rem;
   }
 
-  .cuppy-chip {
+  .cuppy-hero .cuppy-chip {
     width: 100%;
   }
 
-  .cuppy-chip-name {
+  .cuppy-hero .cuppy-chip-name {
     padding: 0 0.6rem;
-    font-size: clamp(0.6875rem, 2.8vw, 0.8125rem);
+    font-size: 0.75rem;
     font-stretch: 100%;
     letter-spacing: 0.02em;
   }
 
-  .cuppy-chip:has(input:checked) {
-    transform: translateY(-0.4rem) scale(1.04);
+  .cuppy-hero .cuppy-chip:has(input:checked) {
+    transform: translateX(0.4rem) scale(1.04);
   }
 
   .cuppy-pitch {
-    order: 4;
+    order: 3;
+    margin-top: var(--cuppy-spoon-room);
+  }
+
+  .cuppy:is([data-motion="still"], [data-scene="fallback"]) .cuppy-pitch {
     margin-top: 2rem;
   }
 
+  /* Copy keeps to the left; the cup settles into the right-hand lane. */
+  .cuppy-pull,
+  .cuppy-close,
+  .cuppy-footer {
+    grid-template-columns: minmax(0, 1fr) var(--cuppy-lane);
+  }
+
+  .cuppy-beat,
   .cuppy-flavor,
-  .cuppy-close {
+  .cuppy-close h2,
+  .cuppy-close-action {
+    grid-column: 1;
+  }
+
+  .cuppy-beat-word {
+    font-size: clamp(2rem, 8.4vw, 3.5rem);
+  }
+
+  .cuppy-flavors-compact .cuppy-flavor-options {
     grid-template-columns: minmax(0, 1fr);
+    max-width: 10rem;
   }
 }
 

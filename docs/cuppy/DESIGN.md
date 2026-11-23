@@ -154,9 +154,9 @@ components:
 
 A drenched lavender ground carries ink type so wide and heavy that it reads as a printed cup band. The product does not sit beside the copy; a real 3D soft-serve cup floats inside the sentence, between the lead line and a full-bleed pedestal word, and its soft plum contact shadow lands on the letters below it. Everything else (pitch, CTA, flavor chips) is small, quiet, and pinned to the edges so the cup and the word own the first viewport.
 
-Density is low and the voice is loud only at display size. Color is the brand's own: lavender as the field, ink for type, outlines and buttons, cream only where it can be read (on ink or chocolate). Chocolate and caramel are not accents; they are whole fields that the page floods into when a flavor is picked. Ink four-point sparkles are the world's ornament and appear on the page, the chips, the ritual list and the printed cup label.
+Density is low and the voice is loud only at display size. Color is the brand's own: lavender as the field, ink for type, outlines and buttons, cream only where it can be read (on ink or chocolate). Chocolate and caramel are not accents; they are whole fields: the flavor panel and the chips take them when a flavor is picked. Ink four-point sparkles are the world's ornament and appear on the page, the chips, the ritual list and the printed cup label.
 
-Motion is soft and physical: a slow bob and pointer tilt on the cup, a cubic ease-out (`cubic-bezier(0.16, 1, 0.3, 1)`) on every UI transition, and one signature moment, the swirl re-tinting with a damped squash-wobble while the flavor band floods to the new color. All of it stops for reduced motion or the in-page pause, and the object settles into a composed resting pose rather than freezing mid-tilt.
+Motion is soft and physical, and the signature moment is the pull, driven by the page's own scroll: a spoon drops in, lifts the real top of the swirl, and stays where it was in the document while the cup travels down with the reader, so a continuous ribbon of cream stretches the whole length of the page and reassembles when scrolling back. Around it: a slow bob and pointer tilt at rest, a cubic ease-out (`cubic-bezier(0.16, 1, 0.3, 1)`) on every UI transition, and the swirl and ribbon re-tinting with a damped squash-wobble on a flavor change. Reduced motion gets one composed 3D still (spoon lifting the top, a short neck of cream) and no scroll scene; the in-page pause stops idle motion but leaves the reader in control of the scroll-driven pull.
 
 **Key Characteristics:**
 
@@ -221,13 +221,13 @@ The site's exact palette, used as fields rather than accents: one drenched groun
 
 ## Layout
 
-The page is three full-bleed bands: the lavender hero, the flavor band, and the ink close with its footer. Horizontal padding is a single fluid gutter, `clamp(1rem, 3.2vw, 2.75rem)`, used everywhere.
+The page is one long pull: the lavender hero, the lavender pull section (the ritual chapters and the flavor panel), and the ink close with its footer. A single fixed, viewport-sized WebGL layer sits above all of it (pointer events off), so the cup can live in viewport space while the spoon lives in document space. Horizontal padding is a single fluid gutter, `clamp(1rem, 3.2vw, 2.75rem)`, used everywhere.
 
 The hero is a column: a 4.5rem masthead (wordmark left; concept tag and motion control right), the lead line top-left, a flexible gap, and the pedestal word at the bottom. Its height stops at `100svh − 4.5rem` (minimum 38rem) so a lip of the flavor band shows above the fold. The 3D stage is absolutely centered over the gap and overlaps the word, width `min(46vw, 74svh, 44rem)`, with the ground line placed so the shadow falls on the letters. Pitch (left, max 23rem) and flavor chips (right) float at the same baseline above the word.
 
-The flavor band and close are two-column grids (1.15fr / 1fr and 1.4fr / 1fr), bottom-aligned, with a `clamp(2rem, 5vw, 5rem)` gap and `clamp(4rem, 9vw, 7.5rem)` vertical padding.
+The pull, close and footer share one grid: `1fr | lane | 1fr`, where the lane (`clamp(17rem, 27vw, 27rem)`) is kept clear for the cup and the ribbon. Chapters alternate sides, one per row: "Dig in." (left, close under the hero), "Lift slow." (right), the flavor panel (right), "Let it stretch." and "Still going." (left), each 0.8 to 1 viewport tall so the ribbon visibly grows between them. The close puts the headline left and the action right; the footer note sits left.
 
-Below 960px the hero stops filling the viewport: the gap becomes a fixed `clamp(18rem, 50svh, 32rem)` window for a full-width cup (max 34rem), the chips become a three-across row under the word, then the pitch and CTA follow. Both grids collapse to one column. Below 421px the motion control goes icon-only (its label stays for assistive tech) and the wordmark suffix drops.
+Below 960px the grid becomes `1fr | 36vw`: all copy runs in the left column and the cup, after the scoop, recedes into the right-hand lane. The hero's gap becomes a fixed `clamp(18rem, 50svh, 32rem)` window for a full-width cup (max 34rem); under the word sits a `62lvh` "spoon room" that stays empty so the scoop never covers copy, then the pitch, CTA and a vertical stack of chips in the left column. With reduced motion or without WebGL, nothing travels down the lane, so the spoon room and the chapter heights collapse to normal reading rhythm. Below 421px the motion control goes icon-only (its label stays for assistive tech) and the wordmark suffix drops.
 
 ## Elevation & Depth
 
@@ -281,9 +281,13 @@ There is no navigation. The masthead holds the wordmark, the concept tag, and an
 
 An original procedural three.js model: a lathed paper cup with a rolled rim, a printed label (pixel sunglasses, "CUPPY", an "ICE CREAM" band with sparkles, all in ink on paper cream), a piped soft-serve swirl with star-nozzle ridges and a curled tip, and three drips. Lit by a warm key from the upper left, a lavender rim from behind right, and a cream-to-lavender hemisphere fill, under neutral tone mapping. It bobs and turns slowly, tilts toward the pointer, and on a flavor change cross-fades its cream and sheen colors over 0.5s while the swirl squashes and wobbles for 1.1s. A WebP still of the same model and camera stands in until WebGL is live and whenever it is unavailable or lost. Exact materials, lights and motion constants are in the sidecar.
 
-### Flavor Band
+### The Pull (signature)
 
-The section after the hero takes the selected flavor's field and ink, cross-fading both over 0.6s: flavor name as headline, a one-line description, and the stepped ritual list with sparkles in the current text color.
+Scroll-driven and fully reversible; positions are a pure function of scroll and layout (`choreography.ts`). Over the first 0.64 viewport heights the spoon (procedural glossy ink plastic, egg-shaped bowl, rising handle) drops in from above, digs into the side of the curl, sinks level under it and lifts the actual top of the swirl, which is split from the base with domed cut faces. A lift integral eases the spoon from riding with the cup to riding with the page, so it settles into the document without a jolt and then scrolls away upward. The cup keeps its spot on screen and then settles low (desktop: centre lane; narrow: receding in depth into the right lane), staying whole above the visible bottom edge to the end of the page. The ribbon (`strand.ts`) is a fluted tube rebuilt in place each frame: it leaves the swirl's cut and the dollop's underside with flared fillets, necks down as it lengthens (volume-conserving, floor radius 0.12 units so it always reads as cream), and carries lumps and flutes on the material so they drift up and lengthen as it stretches. A scroll-velocity spring bows it and lets it wobble on stop; fast pulls tug the cup up a touch.
+
+### Flavor Panel
+
+In the pull, a cup-chip-styled panel (3px ink outline, 28px radius) takes the selected flavor's field and ink, cross-fading over 0.6s: flavor name (sized to the panel with container units), a one-line description, and a second, compact picker ("Pull another flavor") bound to the same state as the hero chips, so the flavor can change mid-stretch.
 
 ## Do's and Don'ts
 

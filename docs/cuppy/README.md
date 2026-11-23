@@ -47,12 +47,14 @@ Contrast: ink on purple ≈ 7.47:1. Cream on purple ≈ 1.99:1 fails at every te
 ## Build notes
 
 - `three` is dynamically imported by `cuppy-stage.tsx` only after a WebGL probe passes, so the route's initial bundle carries no 3D code.
-- Device pixel ratio is capped at 1.75. Rendering pauses when the stage is off screen or the tab is hidden, and stops entirely under reduced motion or the Pause control. All geometry, materials, textures and the context are disposed on unmount. Context loss falls back to the poster and retries twice.
-- Without WebGL the matching poster still is shown; the stage keeps its accessible name in every state.
+- The scoop-and-stretch sequence plays from native scroll (no wheel hijacking or scroll locks) in one fixed, viewport-sized canvas. `choreography.ts` maps scroll and layout to the cup, spoon and camera as a pure function, so it reverses exactly and survives fast scrolling, resizes and mobile toolbar changes (the visible height is eased; the canvas is `100lvh` so it never resizes with the toolbar). `strand.ts` rewrites preallocated ribbon buffers in place, so a long pull allocates nothing.
+- Pixel ratio is capped at 1.5 and about 3.4 megapixels for the full-viewport scene (1.75 for the small reduced-motion still). Frames render only on scroll, idle motion, springs or color blends, and stop while the tab is hidden. The Pause control stops idle motion; the reader still drives the scroll scene. All geometry, materials, textures and the context are disposed on unmount. Context loss falls back to the poster and retries twice.
+- Reduced motion renders a single composed still in the hero slot (spoon lifting the top) instead of the scroll scene. Without WebGL the matching poster still is shown and the chapters close up; the hero slot keeps its accessible name in every state.
+- Unit tests (`choreography.test.ts`) cover the cup staying whole on screen at every scroll position, the spoon staying fixed to the document after the lift, a pull that only grows, step continuity and reversal; `tests/e2e/cuppy.spec.ts` drives the real page.
 
 ## Open items for the owner
 
 1. Publication rights for the name, palette and mascot cues, and whether the cup may carry the sunglasses print.
 2. A vector logo and the licensed display face, if the page should move closer to the live brand.
 3. Current flavors, locations, hours and the preferred CTA destination.
-4. Product photography or stretch video for the next iteration (the stretch interaction).
+4. Product photography or stretch video, to check the procedural stretch against the real product.

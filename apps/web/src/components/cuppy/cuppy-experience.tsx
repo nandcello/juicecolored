@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpRight, Pause, Play } from "lucide-react";
-import { useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 
 import { CuppyStage } from "./cuppy-stage";
 import { CUPPY_INSTAGRAM_URL, FLAVOR_IDS, FLAVORS, isFlavorId, type FlavorId } from "./flavors";
@@ -39,6 +39,51 @@ function CupChip() {
   );
 }
 
+function FlavorPicker({
+  name,
+  legend,
+  value,
+  onChange,
+  compact = false,
+}: {
+  name: string;
+  legend: string;
+  value: FlavorId;
+  onChange: (id: FlavorId) => void;
+  compact?: boolean;
+}) {
+  return (
+    <fieldset className={compact ? "cuppy-flavors cuppy-flavors-compact" : "cuppy-flavors"}>
+      <legend>{legend}</legend>
+      <div className="cuppy-flavor-options">
+        {FLAVOR_IDS.map((id) => {
+          const option = FLAVORS[id];
+          return (
+            <label
+              key={id}
+              className="cuppy-chip"
+              style={{ "--chip-fill": option.field, "--chip-ink": option.ink } as CSSProperties}
+            >
+              <input
+                type="radio"
+                name={name}
+                value={id}
+                checked={value === id}
+                onChange={(event) => {
+                  if (isFlavorId(event.target.value)) onChange(event.target.value);
+                }}
+              />
+              <CupChip />
+              <span className="cuppy-chip-name">{option.name}</span>
+              <Sparkle className="cuppy-chip-sparkle" />
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
 function InstagramLink({ className }: { className: string }) {
   return (
     <a className={className} href={CUPPY_INSTAGRAM_URL} rel="noopener noreferrer">
@@ -52,9 +97,15 @@ function InstagramLink({ className }: { className: string }) {
 export function CuppyExperience() {
   const [flavorId, setFlavorId] = useState<FlavorId>("vanilla");
   const [paused, setPaused] = useState(false);
+  const [sceneStatus, setSceneStatus] = useState("poster");
+  const sceneHost = useRef<HTMLDivElement>(null);
   const reducedMotion = usePrefersReducedMotion();
   const flavor = FLAVORS[flavorId];
   const animate = !reducedMotion && !paused;
+  const mode = reducedMotion ? "still" : "scroll";
+  const onStatus = useCallback((status: string) => setSceneStatus(status), []);
+  // Copy that narrates the live pull only appears while the pull can play.
+  const pulling = mode === "scroll" && sceneStatus !== "fallback";
 
   const theme = {
     "--flavor-field": flavor.field,
@@ -62,7 +113,15 @@ export function CuppyExperience() {
   } as CSSProperties;
 
   return (
-    <div className="cuppy" data-flavor={flavor.id} style={theme}>
+    <div
+      className="cuppy"
+      data-flavor={flavor.id}
+      data-motion={mode}
+      data-scene={mode === "scroll" ? sceneStatus : "still"}
+      style={theme}
+    >
+      {/* Fixed viewport layer for the scroll scene; decorative, the hero slot carries the image name. */}
+      <div ref={sceneHost} className="cuppy-scene" aria-hidden="true" />
       <main>
         <section className="cuppy-hero" aria-labelledby="cuppy-title">
           <header className="cuppy-masthead">
@@ -95,7 +154,13 @@ export function CuppyExperience() {
               <span className="cuppy-title-gap" aria-hidden="true" />
               <span className="cuppy-title-word">stretches.</span>
             </h1>
-            <CuppyStage flavor={flavor} animate={animate} />
+            <CuppyStage
+              flavor={flavor}
+              animate={animate}
+              mode={mode}
+              sceneHost={sceneHost}
+              onStatus={onStatus}
+            />
           </div>
 
           <Sparkle className="cuppy-sparkle cuppy-sparkle-a" />
@@ -105,62 +170,66 @@ export function CuppyExperience() {
           <div className="cuppy-pitch">
             <p>
               Soft serve with a pull. Dig in, lift slow, and Cuppy follows the spoon up, long and
-              silky, before it lets go.
+              silky. Scroll down and see how far it goes.
             </p>
             <InstagramLink className="cuppy-button" />
           </div>
 
-          <fieldset className="cuppy-flavors">
-            <legend>Choose a flavor</legend>
-            <div className="cuppy-flavor-options">
-              {FLAVOR_IDS.map((id) => {
-                const option = FLAVORS[id];
-                return (
-                  <label
-                    key={id}
-                    className="cuppy-chip"
-                    style={
-                      { "--chip-fill": option.field, "--chip-ink": option.ink } as CSSProperties
-                    }
-                  >
-                    <input
-                      type="radio"
-                      name="cuppy-flavor"
-                      value={id}
-                      checked={flavorId === id}
-                      onChange={(event) => {
-                        if (isFlavorId(event.target.value)) setFlavorId(event.target.value);
-                      }}
-                    />
-                    <CupChip />
-                    <span className="cuppy-chip-name">{option.name}</span>
-                    <Sparkle className="cuppy-chip-sparkle" />
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
+          <FlavorPicker
+            name="cuppy-flavor"
+            legend="Choose a flavor"
+            value={flavorId}
+            onChange={setFlavorId}
+          />
         </section>
 
-        <section className="cuppy-flavor" aria-labelledby="cuppy-flavor-name">
-          <div className="cuppy-flavor-copy">
-            <h2 id="cuppy-flavor-name">{flavor.name}</h2>
-            <p>{flavor.line}</p>
-          </div>
-          <ol className="cuppy-ritual" aria-label="How to eat a Cuppy">
-            <li>Dig in.</li>
-            <li>
-              <Sparkle className="cuppy-ritual-sparkle" />
-              Lift slow.
+        <section className="cuppy-pull" aria-labelledby="cuppy-pull-title">
+          <h2 id="cuppy-pull-title" className="cuppy-visually-hidden">
+            How to eat a Cuppy
+          </h2>
+          <ol className="cuppy-ritual">
+            <li className="cuppy-beat cuppy-beat-dig">
+              <span className="cuppy-beat-word">Dig in.</span>
+              <span className="cuppy-beat-line">Right at the top, where the swirl curls over.</span>
             </li>
-            <li>
-              <Sparkle className="cuppy-ritual-sparkle" />
-              Let it stretch.
+            <li className="cuppy-beat cuppy-beat-lift">
+              <span className="cuppy-beat-word">
+                <Sparkle className="cuppy-beat-sparkle" />
+                Lift slow.
+              </span>
+              <span className="cuppy-beat-line">Cuppy comes up with the spoon.</span>
+            </li>
+            <li className="cuppy-beat cuppy-beat-stretch">
+              <span className="cuppy-beat-word">
+                <Sparkle className="cuppy-beat-sparkle" />
+                Let it stretch.
+              </span>
+              <span className="cuppy-beat-line">
+                {pulling ? "Keep scrolling. It keeps up." : "As long as the spoon keeps going."}
+              </span>
             </li>
           </ol>
+
+          <div className="cuppy-flavor" role="group" aria-labelledby="cuppy-flavor-name">
+            <h2 id="cuppy-flavor-name">{flavor.name}</h2>
+            <p>{flavor.line}</p>
+            <FlavorPicker
+              name="cuppy-flavor-pull"
+              legend="Pull another flavor"
+              value={flavorId}
+              onChange={setFlavorId}
+              compact
+            />
+          </div>
+
+          {pulling ? (
+            <p className="cuppy-beat cuppy-beat-still">
+              <span className="cuppy-beat-word">Still going.</span>
+            </p>
+          ) : null}
         </section>
 
-        <section className="cuppy-close" aria-labelledby="cuppy-close-title">
+        <section className="cuppy-close" aria-labelledby="cuppy-close-title" data-cuppy-dark>
           <h2 id="cuppy-close-title">
             Come for the swirl. <span>Stay for the pull.</span>
           </h2>
@@ -174,8 +243,8 @@ export function CuppyExperience() {
       <footer className="cuppy-footer">
         <p>
           Internal design concept, not a live Cuppy page. The Cuppy name, mascot cues and palette
-          belong to Cuppy Ice Cream; publication needs the owner&rsquo;s permission. The 3D cup is
-          an original model and the flavor lines are concept copy, not product claims.
+          belong to Cuppy Ice Cream; publication needs the owner&rsquo;s permission. The 3D cup and
+          spoon are original models and the flavor lines are concept copy, not product claims.
         </p>
       </footer>
     </div>

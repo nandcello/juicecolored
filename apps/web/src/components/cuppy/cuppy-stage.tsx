@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 import type { Flavor } from "./flavors";
 import type { CuppyScene } from "./scene";
 
 type StageStatus = "poster" | "live" | "fallback";
+export type StageMode = "scroll" | "still";
 
 const MAX_RESTARTS = 2;
 
@@ -22,16 +23,40 @@ function canUseWebGL() {
 }
 
 /**
- * Hosts the lazily loaded WebGL cup. Until the scene is ready, and whenever
- * WebGL is unavailable or lost, a still render of the same model stands in.
+ * The hero slot the cup opens in. With full motion the lazily loaded scene
+ * draws into `sceneHost`, a fixed viewport layer, and plays the scoop and
+ * stretch from the page scroll. With reduced motion it draws one still pose
+ * inside this slot. Until the scene is ready, and whenever WebGL is
+ * unavailable or lost, a still render of the cup stands in.
  */
-export function CuppyStage({ flavor, animate }: { flavor: Flavor; animate: boolean }) {
+export function CuppyStage({
+  flavor,
+  animate,
+  mode,
+  sceneHost,
+  onStatus,
+}: {
+  flavor: Flavor;
+  animate: boolean;
+  mode: StageMode;
+  sceneHost: RefObject<HTMLDivElement | null>;
+  onStatus: (status: StageStatus) => void;
+}) {
+  const slotRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<CuppyScene | null>(null);
-  const latest = useRef({ flavor, animate });
+  const latest = useRef({ flavor, animate, onStatus });
   const restarts = useRef(0);
   const [status, setStatus] = useState<StageStatus>("poster");
   const [epoch, setEpoch] = useState(0);
+
+  useEffect(() => {
+    latest.current.onStatus = onStatus;
+  }, [onStatus]);
+
+  useEffect(() => {
+    latest.current.onStatus(status);
+  }, [status]);
 
   useEffect(() => {
     latest.current.flavor = flavor;
@@ -44,24 +69,16 @@ export function CuppyStage({ flavor, animate }: { flavor: Flavor; animate: boole
   }, [animate]);
 
   useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
+    const slot = slotRef.current;
+    const host = mode === "scroll" ? sceneHost.current : hostRef.current;
+    if (!slot || !host) return;
     if (!canUseWebGL()) {
       setStatus("fallback");
       return;
     }
     let cancelled = false;
     let scene: CuppyScene | null = null;
-    let inView = true;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        inView = entry.isIntersecting;
-        scene?.setInView(inView);
-      },
-      { rootMargin: "120px" },
-    );
-    observer.observe(host);
+    setStatus("poster");
 
     const onContextLost = () => {
       sceneRef.current = null;
@@ -77,7 +94,9 @@ export function CuppyStage({ flavor, animate }: { flavor: Flavor; animate: boole
         createCuppyScene(host, {
           flavor: latest.current.flavor,
           animate: latest.current.animate,
-          fontFamily: getComputedStyle(host).fontFamily,
+          mode,
+          slot,
+          fontFamily: getComputedStyle(slot).fontFamily,
           onContextLost,
         }),
       )
@@ -88,8 +107,8 @@ export function CuppyStage({ flavor, animate }: { flavor: Flavor; animate: boole
         }
         scene = created;
         sceneRef.current = created;
-        created.setInView(inView);
         // Flavor or motion may have changed while the module loaded.
+        created.setFlavor(latest.current.flavor);
         created.setAnimate(latest.current.animate);
         setStatus("live");
       })
@@ -99,14 +118,20 @@ export function CuppyStage({ flavor, animate }: { flavor: Flavor; animate: boole
 
     return () => {
       cancelled = true;
-      observer.disconnect();
       scene?.dispose();
       sceneRef.current = null;
     };
-  }, [epoch]);
+  }, [epoch, mode, sceneHost]);
 
   return (
-    <div className="cuppy-stage" data-status={status} role="img" aria-label={flavor.posterAlt}>
+    <div
+      ref={slotRef}
+      className="cuppy-stage"
+      data-status={status}
+      data-mode={mode}
+      role="img"
+      aria-label={flavor.posterAlt}
+    >
       {/* Still renders of the same procedural model; no brand artwork. */}
       {/* oxlint-disable-next-line nextjs/no-img-element */}
       <img
