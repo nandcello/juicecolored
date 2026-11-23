@@ -1,0 +1,4 @@
+{
+  "prompt": "Origin: rendered in-browser from the original procedural three.js model in apps/web/src/components/cuppy/scene.ts (swirl geometry in swirl.ts, spoon in spoon.ts, strand in strand.ts). Captured by a Playwright script that forces the hero slot to a 720x1068 CSS stage at 1.5x DPR, hides the page copy and background, screenshots the slot with transparency and re-encodes it with canvas.toDataURL(\"image/webp\", 0.86). Pose: the scroll scene's first frame (no-preference motion, frame loop frozen at t = 0: full swirl, no spoon). Vanilla is the page's single art-directed cream; the earlier poster-vanilla/chocolate/salted-caramel renders are kept for history but no longer referenced. No brand artwork, photography, or generated imagery. The printed pixel-sunglasses label is a user-approved nod to the Cuppy mascot; Cuppy brand rights apply (publication permission pending).\n",
+  "createdAt": "2026-11-23T04:26:25.000Z"
+}

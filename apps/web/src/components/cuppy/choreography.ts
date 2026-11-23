@@ -19,7 +19,16 @@ export const PRODUCT = {
   float: 0.42,
   /** Widest point, the first coil over the rim. */
   width: 2.2,
+  /** The paper cup tapers from its foot to the rim. */
+  cupBottomRadius: 0.745,
+  cupTopRadius: 1,
 } as const;
+
+/** Outer radius of the cup wall at height y above its foot. */
+export function cupWallRadius(y: number) {
+  const t = clamp((y - 0.05) / (PRODUCT.cupTop - 0.05));
+  return PRODUCT.cupBottomRadius + (PRODUCT.cupTopRadius - PRODUCT.cupBottomRadius) * t;
+}
 
 /** Swirl rows above this fraction of its height are the piece the spoon lifts. */
 export const SWIRL_CUT_V = 0.62;
@@ -74,6 +83,8 @@ export type Choreography = {
   pulled: number;
   /** 0..1 through the stretch, from the anchor to the end of the page. */
   stretch: number;
+  /** 0..1, how much of the swirl left in the cup has been drawn into the strand. */
+  drawn: number;
   /** How much of the idle float and sway may play, 0..1. */
   sway: number;
 };
@@ -268,12 +279,38 @@ export function choreograph(scrollY: number, metrics: StageMetrics): Choreograph
     anchored: s >= beats.anchor,
     pulled,
     stretch: clamp((s - beats.anchor) / stretchSpan),
+    drawn: creamDrawn(s, beats, maxScroll),
     // Idle float stops before the spoon touches the cream (so the top is
     // handed over exactly) and returns, gentler, once the pull is underway.
     sway:
       1 -
       smoothstep(0, beats.hover, s) +
       0.45 * smoothstep(beats.anchor, beats.anchor + 0.4 * height, s),
+  };
+}
+
+/**
+ * How much of the cream left in the cup the strand has drawn out: none until
+ * the spoon has the top, then steadily more for the rest of the page, eased so
+ * the cup is visibly emptier by mid-scroll and almost empty at the end.
+ */
+export function creamDrawn(s: number, beats: Beats, maxScroll: number) {
+  const p = clamp((s - beats.cradle) / Math.max(1, maxScroll - beats.cradle));
+  return 1 - Math.pow(1 - p, 1.5);
+}
+
+/**
+ * Shape of the cream left in the cup once `drawn` of it has gone into the
+ * strand. The swirl settles down into the cup (sink), its coils slump closer
+ * together (tall) and it draws in from the wall (wide), so it never pushes
+ * through the paper. Only the cream changes; the cup keeps its size.
+ */
+export function creamLeft(drawn: number) {
+  const d = clamp(drawn);
+  return {
+    sink: 0.4 * d,
+    tall: 1 - 0.55 * d,
+    wide: 1 - 0.06 * smoothstep(0, 0.05, d) - 0.09 * d,
   };
 }
 

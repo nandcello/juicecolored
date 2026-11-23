@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { FLAVOR_IDS, FLAVORS, isFlavorId } from "./flavors";
 import { buildSwirl, swirlEnvelope, weldSeamNormals } from "./swirl";
 
 describe("buildSwirl", () => {
@@ -41,17 +40,5 @@ describe("buildSwirl", () => {
       normals[last + 1],
       normals[last + 2],
     ]);
-  });
-});
-
-describe("flavors", () => {
-  it("offers only the three source-visible flavors", () => {
-    expect(FLAVOR_IDS.map((id) => FLAVORS[id].name)).toEqual([
-      "Vanilla",
-      "Chocolate",
-      "Salted Caramel",
-    ]);
-    expect(isFlavorId("salted-caramel")).toBe(true);
-    expect(isFlavorId("mango")).toBe(false);
   });
 });

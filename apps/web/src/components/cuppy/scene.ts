@@ -9,7 +9,6 @@ import {
   BufferGeometry,
   CanvasTexture,
   CatmullRomCurve3,
-  Color,
   DirectionalLight,
   DoubleSide,
   DynamicDrawUsage,
@@ -46,7 +45,9 @@ import {
   choreograph,
   BEND_SPRING,
   cradlePose,
+  creamLeft,
   cupViewportBox,
+  cupWallRadius,
   PRODUCT,
   projectToViewport,
   TUG_SPRING,
@@ -56,13 +57,13 @@ import {
   type Choreography,
   type StageMetrics,
 } from "./choreography";
-import type { Flavor } from "./flavors";
+import { CREAM } from "./brand";
 import { buildBowl, buildHandle, SPOON } from "./spoon";
 import { createStrandBuffers, writeStrand, type StrandInput } from "./strand";
 import { buildSwirl, splitSwirl, weldSeamNormals, type SwirlPiece } from "./swirl";
 
 export type CuppySceneOptions = {
-  flavor: Flavor;
+  /** Idle float, pointer tilt and scroll springs. Off for the reduced-motion still. */
   animate: boolean;
   /**
    * "scroll": a fixed, viewport-sized stage that plays the scoop and stretch
@@ -77,17 +78,14 @@ export type CuppySceneOptions = {
 };
 
 export type CuppyScene = {
-  setFlavor: (flavor: Flavor) => void;
-  setAnimate: (animate: boolean) => void;
-  setInView: (inView: boolean) => void;
   dispose: () => void;
 };
 
 const INK = "#17131A";
 const PAPER = "#F2E6D2";
 const CUP_TOP = PRODUCT.cupTop;
-const CUP_BOTTOM_RADIUS = 0.745;
-const CUP_TOP_RADIUS = 1;
+const CUP_BOTTOM_RADIUS = PRODUCT.cupBottomRadius;
+const CUP_TOP_RADIUS = PRODUCT.cupTopRadius;
 /** The product turns about a point this far above its foot. */
 const FLOAT_PIVOT = 1.5;
 /** The ground line sits this fraction of the slot's height above its bottom. */
@@ -96,6 +94,16 @@ const MAX_PIXEL_RATIO = 1.75;
 /** The scroll stage covers the viewport, so it gets a lower ratio and a pixel budget. */
 const MAX_PIXEL_RATIO_FULL = 1.5;
 const MAX_PIXELS = 3_400_000;
+/**
+ * The contact shadow, sized to the cup rather than the swirl: the soft pool is
+ * a little wider than the rim, the core about the foot. It sits a little above
+ * the ground line so it reads as close under the floating cup, not as a
+ * separate disc, and it never spills past the cup's lane on a phone.
+ */
+const SHADOW_SOFT = 2.5;
+const SHADOW_CORE = 1.25;
+const SHADOW_RISE = 0.16;
+const SHADOW_OFFSET = { x: 0.1, z: -0.12 } as const;
 
 function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
   const waist = size * 0.22;
@@ -221,20 +229,19 @@ function shadowTexture() {
   canvas.height = size;
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
+  // A Gaussian falloff that reaches zero at the edge: no rim, no lens shape.
   const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  gradient.addColorStop(0, "rgba(20,10,26,0.9)");
-  gradient.addColorStop(0.35, "rgba(20,10,26,0.55)");
-  gradient.addColorStop(0.7, "rgba(20,10,26,0.15)");
-  gradient.addColorStop(1, "rgba(20,10,26,0)");
+  for (let i = 0; i <= 12; i++) {
+    const r = i / 12;
+    const alpha = Math.exp(-((r / 0.46) ** 2) * 1.6) * (1 - r * r);
+    gradient.addColorStop(r, `rgba(40,20,48,${alpha.toFixed(3)})`);
+  }
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
   return canvas;
 }
 
-function wallRadius(y: number) {
-  const t = Math.min(1, Math.max(0, (y - 0.05) / (CUP_TOP - 0.05)));
-  return CUP_BOTTOM_RADIUS + (CUP_TOP_RADIUS - CUP_BOTTOM_RADIUS) * t;
-}
+const wallRadius = cupWallRadius;
 
 function smooth(edge0: number, edge1: number, x: number) {
   const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
@@ -249,9 +256,11 @@ function smooth(edge0: number, edge1: number, x: number) {
 function makeDrip(length: number, material: Material) {
   const lipY = CUP_TOP - 0.04;
   const endY = lipY - length;
+  // It starts down inside the cup and hugs the rolled lip, so once the swirl
+  // has been drawn down it still reads as cream over the rim, not a knob on it.
   const curve = new CatmullRomCurve3([
-    new Vector3(0, CUP_TOP + 0.06, CUP_TOP_RADIUS - 0.12),
-    new Vector3(0, CUP_TOP + 0.085, CUP_TOP_RADIUS + 0.02),
+    new Vector3(0, CUP_TOP - 0.12, CUP_TOP_RADIUS - 0.2),
+    new Vector3(0, CUP_TOP + 0.03, CUP_TOP_RADIUS - 0.01),
     new Vector3(0, lipY, wallRadius(lipY) + 0.08),
     new Vector3(0, lipY - length * 0.5, wallRadius(lipY - length * 0.5) + 0.05),
     new Vector3(0, endY, wallRadius(endY) + 0.055),
@@ -274,9 +283,10 @@ function makeDrip(length: number, material: Material) {
     if (t < 0.06) r *= Math.sqrt(Math.max(0, 1 - ((0.06 - t) / 0.06) ** 2));
     for (let i = 0; i <= radial; i++) {
       const a = (i / radial) * Math.PI * 2;
-      // Flatten toward the wall so the strand reads as running down it.
+      // Flatten toward the wall so the strand reads as running down it, and
+      // flatter still where it crosses the lip, so it reads as a smear.
       const x = Math.cos(a) * r;
-      const n = Math.sin(a) * r * 0.62;
+      const n = Math.sin(a) * r * (0.62 - 0.22 * (1 - smooth(0.1, 0.32, t)));
       positions.push(
         point.x + side.x * x + across.x * n,
         point.y + side.y * x + across.y * n,
@@ -404,14 +414,14 @@ export async function createCuppyScene(
   });
   const rimPaper = new MeshStandardMaterial({ color: "#F6ECDD", roughness: 0.6 });
   const cream = new MeshPhysicalMaterial({
-    color: options.flavor.cream,
+    color: CREAM.base,
     vertexColors: true,
     roughness: 0.46,
     clearcoat: 0.3,
     clearcoatRoughness: 0.42,
     sheen: 0.55,
     sheenRoughness: 0.55,
-    sheenColor: options.flavor.sheen,
+    sheenColor: CREAM.sheen,
     bumpMap: bump,
     bumpScale: 0.2,
   });
@@ -435,10 +445,8 @@ export async function createCuppyScene(
     transparent: true,
     depthWrite: false,
     toneMapped: false,
-    opacity: 0.55,
   });
   const shadowCore = shadowSoft.clone();
-  shadowCore.opacity = 0.5;
   const materials: Material[] = [
     paper,
     paperPlain,
@@ -487,8 +495,8 @@ export async function createCuppyScene(
     mesh.receiveShadow = true;
   }
 
-  // Swirl, split where the spoon takes it. The base pivots at the cup so a
-  // flavor change can squash it; the top is placed by hand every frame.
+  // Swirl, split where the spoon takes it. The base pivots at the cup so it
+  // can settle as the strand draws it out; the top is placed by hand every frame.
   const swirlData = buildSwirl({ height: PRODUCT.swirlHeight });
   const pieces = splitSwirl(swirlData, SWIRL_CUT_V);
   const cutCenter = new Vector3(...pieces.base.cutCenter);
@@ -530,12 +538,15 @@ export async function createCuppyScene(
   const cupRoot = new Group();
   cupRoot.add(float);
 
+  // Contact shadow: a wide soft pool plus a tighter core under the foot, both
+  // nudged right and back, away from the key light at the upper left.
   const shadowPlane = new PlaneGeometry(1, 1);
   const softShadow = new Mesh(shadowPlane, shadowSoft);
   softShadow.rotation.x = -Math.PI / 2;
+  softShadow.position.set(SHADOW_OFFSET.x, SHADOW_RISE, SHADOW_OFFSET.z);
   const coreShadow = new Mesh(shadowPlane, shadowCore);
   coreShadow.rotation.x = -Math.PI / 2;
-  coreShadow.position.y = 0.001;
+  coreShadow.position.set(SHADOW_OFFSET.x * 0.5, SHADOW_RISE + 0.001, SHADOW_OFFSET.z * 0.5);
   cupRoot.add(softShadow, coreShadow);
 
   const spoon = new Group();
@@ -582,7 +593,7 @@ export async function createCuppyScene(
   const cutOffset = new Matrix4().makeTranslation(cutCenter.x, cutCenter.y, cutCenter.z);
 
   // State
-  let animate = options.animate;
+  const animate = options.animate;
   let pageVisible = document.visibilityState === "visible";
   let frameId = 0;
   let elapsed = 0;
@@ -595,12 +606,6 @@ export async function createCuppyScene(
   const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
   const bend: Spring = { value: 0, velocity: 0 };
   const tug: Spring = { value: 0, velocity: 0 };
-  const fromColor = new Color(options.flavor.cream);
-  const toColor = new Color(options.flavor.cream);
-  const fromSheen = new Color(options.flavor.sheen);
-  const toSheen = new Color(options.flavor.sheen);
-  let blend = 1;
-  let squash = 1;
   let reported = "";
 
   const tmp = {
@@ -748,29 +753,11 @@ export async function createCuppyScene(
     spoon.position.set(frame.spoon.x, frame.spoon.y, frame.spoon.z);
     spoon.rotation.set(frame.spoon.rx, frame.spoon.ry, frame.spoon.rz - bend.value * 0.04, "YXZ");
 
-    if (blend < 1) {
-      blend = Math.min(1, blend + dt / 0.5);
-      applyColor(1 - Math.pow(1 - blend, 3));
-      moving = true;
-    }
-    // The swirl left in the cup gives up cream to the strand as it lengthens.
-    const drain = holding ? frame.stretch : 0;
-    const keepWide = 1 - 0.07 * drain;
-    const keepTall = 1 - 0.2 * drain;
-    if (squash < 1 && animate) {
-      squash = Math.min(1, squash + dt / 1.1);
-      const s = squash * 1.1;
-      const wobble = Math.exp(-s * 5) * Math.cos(s * 13);
-      swirlPivot.scale.set(
-        (1 + wobble * 0.06) * keepWide,
-        (1 - wobble * 0.09) * keepTall,
-        (1 + wobble * 0.06) * keepWide,
-      );
-      moving = true;
-    } else {
-      squash = 1;
-      swirlPivot.scale.set(keepWide, keepTall, keepWide);
-    }
+    // The swirl left in the cup gives up its cream to the strand: it settles
+    // into the cup as the pull lengthens, and fills back up on the way up.
+    const left = creamLeft(frame.drawn);
+    swirlPivot.position.y = PRODUCT.swirlBase - left.sink;
+    swirlPivot.scale.set(left.wide, left.tall, left.wide);
 
     cupRoot.updateMatrixWorld(true);
     spoon.updateMatrixWorld(true);
@@ -846,32 +833,26 @@ export async function createCuppyScene(
         ? "stretch"
         : "lift";
     const box = cupViewportBox(frame, m);
-    const next = `${phase}|${frame.stretch.toFixed(2)}|${Math.round(box.top)}|${Math.round(box.bottom)}`;
+    const next = `${phase}|${frame.stretch.toFixed(2)}|${frame.drawn.toFixed(2)}|${Math.round(box.top)}|${Math.round(box.bottom)}`;
     if (next === reported && container.dataset.sceneOwner === owner) return;
     reported = next;
     container.dataset.sceneOwner = owner;
     container.dataset.phase = phase;
     container.dataset.stretch = frame.stretch.toFixed(2);
+    container.dataset.drawn = frame.drawn.toFixed(2);
     container.dataset.cupTop = String(Math.round(box.top));
     container.dataset.cupBottom = String(Math.round(box.bottom));
   }
 
-  function placeShadow(height: number) {
-    const lift = height;
-    softShadow.scale.set(3.1 - lift * 0.18, 3.1 - lift * 0.18, 1);
-    shadowSoft.opacity = (0.42 - lift * 0.06) * shadowFade;
-    coreShadow.scale.set(1.7 - lift * 0.14, 1.7 - lift * 0.14, 1);
-    shadowCore.opacity = (0.42 - lift * 0.1) * shadowFade;
+  /** `lift` is the bob, -1..1: higher up, the shadow spreads a touch and fades. */
+  function placeShadow(lift: number) {
+    const soft = SHADOW_SOFT * (1 + lift * 0.04);
+    softShadow.scale.set(soft, soft * 0.92, 1);
+    shadowSoft.opacity = (0.44 - lift * 0.05) * shadowFade;
+    const core = SHADOW_CORE * (1 - lift * 0.05);
+    coreShadow.scale.set(core, core * 0.9, 1);
+    shadowCore.opacity = (0.4 - lift * 0.08) * shadowFade;
     softShadow.visible = coreShadow.visible = shadowFade > 0.01;
-  }
-
-  function applyColor(amount: number) {
-    cream.color.lerpColors(fromColor, toColor, amount);
-    cream.sheenColor.lerpColors(fromSheen, toSheen, amount);
-    for (const material of [dripCream, strandCream]) {
-      material.color.copy(cream.color);
-      material.sheenColor.copy(cream.sheenColor);
-    }
   }
 
   function tick(now: number) {
@@ -949,33 +930,6 @@ export async function createCuppyScene(
   request();
 
   return {
-    setFlavor(flavor) {
-      fromColor.copy(cream.color);
-      fromSheen.copy(cream.sheenColor);
-      toColor.set(flavor.cream);
-      toSheen.set(flavor.sheen);
-      if (animate && pageVisible) {
-        blend = 0;
-        squash = 0;
-        request();
-      } else {
-        blend = 1;
-        applyColor(1);
-        renderNow();
-      }
-    },
-    setAnimate(next) {
-      animate = next;
-      if (!next) {
-        pointer.x = pointer.tx = pointer.y = pointer.ty = 0;
-        renderNow();
-      }
-      request();
-    },
-    setInView() {
-      // The scroll stage is always in view; the still stage renders on demand.
-      request();
-    },
     dispose() {
       disposed = true;
       stop();
@@ -997,7 +951,7 @@ export async function createCuppyScene(
       renderer.forceContextLoss();
       canvas.remove();
       if (container.dataset.sceneOwner === owner) {
-        for (const key of ["sceneOwner", "phase", "stretch", "cupTop", "cupBottom"]) {
+        for (const key of ["sceneOwner", "phase", "stretch", "drawn", "cupTop", "cupBottom"]) {
           delete container.dataset[key];
         }
       }

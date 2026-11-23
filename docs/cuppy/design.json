@@ -103,15 +103,25 @@
       }
     },
     "flavorRoles": {
-      "source": "apps/web/src/components/cuppy/flavors.ts",
-      "note": "field and ink drive the chip and flavor band via --chip-fill/--chip-ink and --flavor-field/--flavor-ink; cream and sheen drive the 3D swirl material only.",
-      "vanilla": { "field": "#F2E6D2", "ink": "#17131A", "cream": "#F4E4C4", "sheen": "#FFF7E8" },
-      "chocolate": { "field": "#58362E", "ink": "#F2E6D2", "cream": "#6B4131", "sheen": "#B88468" },
-      "salted-caramel": {
-        "field": "#D59D58",
-        "ink": "#17131A",
-        "cream": "#C8893F",
-        "sheen": "#F4CB8A"
+      "source": "apps/web/src/components/cuppy/brand.ts",
+      "note": "One art-directed cream. The flavor selector was removed in the polish pass of 2026-11-23; the earlier per-flavor values are kept here for history and are not used.",
+      "cream": {
+        "cream": "#F4E4C4",
+        "sheen": "#FFF7E8"
+      },
+      "retired": {
+        "chocolate": {
+          "field": "#58362E",
+          "ink": "#F2E6D2",
+          "cream": "#6B4131",
+          "sheen": "#B88468"
+        },
+        "salted-caramel": {
+          "field": "#D59D58",
+          "ink": "#17131A",
+          "cream": "#C8893F",
+          "sheen": "#F4CB8A"
+        }
       }
     },
     "typographyMeta": {
@@ -123,7 +133,10 @@
         "displayName": "Display lead",
         "purpose": "Opening phrase above the cup. Narrow screens: clamp(1.75rem, 9.6vw, 4rem)."
       },
-      "headline": { "displayName": "Headline", "purpose": "Flavor name in the flavor band." },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Reserved display step (the flavor band that used it was removed)."
+      },
       "headline-close": {
         "displayName": "Headline close",
         "purpose": "Closing statement on ink; accent span in lavender."
@@ -136,16 +149,22 @@
         "displayName": "Wordmark",
         "purpose": "Masthead name; 1.125rem below 960px. Suffix at 0.55em, 700, 0.12em tracking."
       },
-      "body-lead": { "displayName": "Body lead", "purpose": "Flavor line, max 30ch." },
+      "body-lead": {
+        "displayName": "Body lead",
+        "purpose": "Reserved lead step, max 30ch (the flavor line that used it was removed)."
+      },
       "body": {
         "displayName": "Body",
         "purpose": "Default text; pitch at clamp(1rem, 1.25vw, 1.1875rem); close copy 1.125rem, max 28ch."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "Fieldset legend and chip names (chip names at 0.04em; 100% width and clamp(0.6875rem, 2.8vw, 0.8125rem) below 960px). Concept tag uses 0.75rem at 112%, 0.08em."
+        "purpose": "Small uppercase labels. Concept tag uses 0.75rem at 112%, 0.08em."
       },
-      "button": { "displayName": "Button", "purpose": "CTA pills, uppercase." },
+      "button": {
+        "displayName": "Button",
+        "purpose": "CTA pills, uppercase."
+      },
       "fine-print": {
         "displayName": "Fine print",
         "purpose": "Footer disclosure, cream at 74% alpha, max 72ch."
@@ -163,19 +182,9 @@
         "purpose": "Ink button hover, with translateY(-2px)."
       },
       {
-        "name": "chip-rest",
-        "value": "drop-shadow(0 8px 10px rgb(58 34 64 / 0.22))",
-        "purpose": "filter on the cup-chip SVG."
-      },
-      {
-        "name": "chip-selected",
-        "value": "drop-shadow(0 14px 14px rgb(58 34 64 / 0.32))",
-        "purpose": "filter on the selected cup chip."
-      },
-      {
         "name": "cup-contact",
-        "value": "radial-gradient rgba(20,10,26,0.9) 0 / 0.55 35% / 0.15 70% / 0 100%",
-        "purpose": "Two stacked ground planes under the 3D cup (soft scale 3.1, core 1.7; opacity 0.42 at rest), shrinking and fading as the cup bobs up."
+        "value": "Gaussian radial falloff, rgb(40 20 48), alpha exp(-1.6 (r/0.46)^2) (1 - r^2), reaching 0 at the edge",
+        "purpose": "Two stacked ground planes under the 3D cup: soft 2.5 x 2.3 units at opacity 0.44, core 1.25 x 1.13 at 0.4; lifted 0.16 off the ground line and offset (0.1, -0.12) away from the key light; widening 4% and fading slightly as the cup bobs up; fading out over the ink close. Sized to the cup so it stays inside the phone lane."
       }
     ],
     "motion": [
@@ -184,31 +193,15 @@
         "value": "cubic-bezier(0.16, 1, 0.3, 1)",
         "purpose": "--cuppy-ease-out; every UI transition."
       },
-      { "name": "button", "value": "0.25s", "purpose": "Button lift, shadow and arrow nudge." },
       {
-        "name": "chip",
-        "value": "0.35s",
-        "purpose": "Chip lift/select transform and shadow filter; chip sparkle opacity 0.3s, transform 0.45s."
-      },
-      {
-        "name": "flavor-flood",
-        "value": "0.6s",
-        "purpose": "Flavor band background and text color cross-fade."
+        "name": "button",
+        "value": "0.25s",
+        "purpose": "Button lift, shadow and arrow nudge."
       },
       {
         "name": "sparkle-twinkle",
         "value": "3.2s ease-in-out infinite; scale 1 to 0.72, rotate 0 to 12deg; staggered -1.1s, -2.2s",
         "purpose": "Hero sparkles."
-      },
-      {
-        "name": "swirl-retint",
-        "value": "0.5s, ease-out cubic (1 - (1 - t)^3)",
-        "purpose": "3D cream and sheen color cross-fade on flavor change."
-      },
-      {
-        "name": "swirl-squash",
-        "value": "1.1s; wobble = exp(-5s) * cos(13s); scale x/z 1 + 0.06w, y 1 - 0.09w",
-        "purpose": "Damped squash-wobble of the swirl on flavor change."
       },
       {
         "name": "cup-float",
@@ -217,25 +210,29 @@
       },
       {
         "name": "reduced-motion",
-        "value": "prefers-reduced-motion: reduce, or the in-page pause",
-        "purpose": "CSS: sparkle animation off (paused via toggle), chip/button/flavor transitions off. 3D: render loop stops; cup settles to rotation (0.02, 0.18, 0), y 0, scale 1, colors applied instantly. Loop also stops off-screen (120px root margin) and when the tab is hidden."
+        "value": "prefers-reduced-motion: reduce (the OS/browser setting is the only switch; no in-page control, nothing stored)",
+        "purpose": "Read live in both directions. CSS (from the first paint, before script): sparkle animation and button transitions off, short reading layout, pull-narrating copy hidden; a <picture> source swaps in the still poster. Script: the scroll scene is torn down and one composed 3D still renders on demand in the hero slot (no frame loop); switching back restores the scroll scene. Never both at once. Without script (scripting: none) the same still layout applies."
+      },
+      {
+        "name": "cream-drain",
+        "value": "drawn = 1 - (1 - p)^1.5, p = (scroll - cradle) / (maxScroll - cradle); sink 0.4d, tall 1 - 0.55d, wide 1 - 0.06 smoothstep(0, 0.05, d) - 0.09d",
+        "purpose": "The cream left in the cup settles into it as the strand lengthens: about half shows above the rim at mid-scroll, a thin layer at the end; reverses exactly. Cream geometry only: no cup, scene-scale or opacity change."
       }
     ],
     "breakpoints": [
       {
         "name": "narrow",
         "value": "max-width: 959px",
-        "purpose": "Hero stops filling the viewport; chips become a 3-across row under the word; grids collapse to one column."
+        "purpose": "Hero stops filling the viewport; the pitch and CTA stack in the left column under the spoon room; grids collapse to copy plus the cup lane."
       },
       {
         "name": "compact",
         "value": "max-width: 420px",
-        "purpose": "Motion toggle icon-only (label visually hidden), wordmark suffix hidden, smaller concept tag."
+        "purpose": "Wordmark suffix hidden, smaller concept tag."
       }
     ],
     "focus": {
       "global": "outline: 3px solid #17131A; outline-offset: 4px; border-radius: 6px",
-      "chip": "outline: 3px solid #17131A; outline-offset: 5px; border-radius: 12px (on the label via :has(input:focus-visible))",
       "on-ink": "cream button switches its outline color to #F2E6D2",
       "selection": "background #17131A; color #F2E6D2"
     },
@@ -249,7 +246,10 @@
         "clearColor": "transparent",
         "maxPixelRatio": 1.75
       },
-      "environment": { "source": "RoomEnvironment via PMREM (blur 0.04)", "intensity": 0.55 },
+      "environment": {
+        "source": "RoomEnvironment via PMREM (blur 0.04)",
+        "intensity": 0.55
+      },
       "camera": {
         "type": "perspective",
         "fov": 26,
@@ -320,14 +320,14 @@
         {
           "name": "cream",
           "type": "physical",
-          "color": "flavor.cream",
+          "color": "#F4E4C4",
           "vertexColors": "baked crease occlusion (1 - 0.42 crease - 0.25 base)",
           "roughness": 0.46,
           "clearcoat": 0.3,
           "clearcoatRoughness": 0.42,
           "sheen": 0.55,
           "sheenRoughness": 0.55,
-          "sheenColor": "flavor.sheen",
+          "sheenColor": "#FFF7E8",
           "bumpMap": "tileable value noise 128px",
           "bumpScale": 0.2
         },
@@ -347,7 +347,7 @@
         "ridges": "3 star-nozzle flutes per coil, amplitude 0.038",
         "tip": "curl from v 0.58, lean 0.44, drop 0.2"
       },
-      "fallback": "WebP still of the same model and camera (apps/web/public/cuppy/poster-<flavor>.webp, 720x1068) shown until live and on WebGL absence or context loss (up to 2 restarts)."
+      "fallback": "WebP stills of the same model (apps/web/public/cuppy/poster-rest.webp for the scroll scene's first frame, poster-still.webp for the reduced-motion pose; 720x1068 CSS at 1.5x), chosen by a <picture> media source on prefers-reduced-motion and shown until live, without script, and on WebGL absence or context loss (up to 2 restarts). The older poster-<flavor>.webp renders are kept for history, unreferenced."
     }
   },
   "components": [
@@ -368,14 +368,6 @@
       "css": ".ds-btn-cream { display: inline-flex; align-items: center; gap: 0.6rem; min-height: 3.25rem; padding: 0 1.4rem 0 1.6rem; border-radius: 999px; background: #F2E6D2; color: #17131A; font-family: Archivo, 'Arial Narrow', Arial, sans-serif; font-size: 0.875rem; font-weight: 800; font-stretch: 118%; letter-spacing: 0.04em; text-decoration: none; text-transform: uppercase; white-space: nowrap; transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-cream svg { width: 1.15rem; height: 1.15rem; transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-cream:hover { transform: translateY(-2px); } .ds-btn-cream:hover svg { transform: translate(2px, -2px); } .ds-btn-cream:focus-visible { outline: 3px solid #F2E6D2; outline-offset: 4px; border-radius: 6px; }"
     },
     {
-      "name": "Cup Chip Flavor Selector",
-      "kind": "chip",
-      "refersTo": "cup-chip-vanilla",
-      "description": "Radio group of cup-silhouette chips; selected chip shifts, thickens its outline and gains a sparkle.",
-      "html": "<fieldset class=\"ds-flavors\"><legend>Choose a flavor</legend><label class=\"ds-chip\" style=\"--chip-fill:#F2E6D2;--chip-ink:#17131A\"><input type=\"radio\" name=\"ds-flavor\" checked><svg class=\"ds-chip-cup\" viewBox=\"0 0 168 112\" aria-hidden=\"true\"><path d=\"M8 20 L24 100 Q26 108 35 108 L133 108 Q142 108 144 100 L160 20 Z\"/><ellipse cx=\"84\" cy=\"20\" rx=\"78\" ry=\"12\"/></svg><span class=\"ds-chip-name\">Vanilla</span><svg class=\"ds-chip-sparkle\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 0C12.9 7.5 16.5 11.1 24 12C16.5 12.9 12.9 16.5 12 24C11.1 16.5 7.5 12.9 0 12C7.5 11.1 11.1 7.5 12 0Z\"/></svg></label><label class=\"ds-chip\" style=\"--chip-fill:#58362E;--chip-ink:#F2E6D2\"><input type=\"radio\" name=\"ds-flavor\"><svg class=\"ds-chip-cup\" viewBox=\"0 0 168 112\" aria-hidden=\"true\"><path d=\"M8 20 L24 100 Q26 108 35 108 L133 108 Q142 108 144 100 L160 20 Z\"/><ellipse cx=\"84\" cy=\"20\" rx=\"78\" ry=\"12\"/></svg><span class=\"ds-chip-name\">Chocolate</span><svg class=\"ds-chip-sparkle\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 0C12.9 7.5 16.5 11.1 24 12C16.5 12.9 12.9 16.5 12 24C11.1 16.5 7.5 12.9 0 12C7.5 11.1 11.1 7.5 12 0Z\"/></svg></label><label class=\"ds-chip\" style=\"--chip-fill:#D59D58;--chip-ink:#17131A\"><input type=\"radio\" name=\"ds-flavor\"><svg class=\"ds-chip-cup\" viewBox=\"0 0 168 112\" aria-hidden=\"true\"><path d=\"M8 20 L24 100 Q26 108 35 108 L133 108 Q142 108 144 100 L160 20 Z\"/><ellipse cx=\"84\" cy=\"20\" rx=\"78\" ry=\"12\"/></svg><span class=\"ds-chip-name\">Salted Caramel</span><svg class=\"ds-chip-sparkle\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 0C12.9 7.5 16.5 11.1 24 12C16.5 12.9 12.9 16.5 12 24C11.1 16.5 7.5 12.9 0 12C7.5 11.1 11.1 7.5 12 0Z\"/></svg></label></fieldset>",
-      "css": ".ds-flavors { display: grid; gap: 0.5rem; border: 0; margin: 0; padding: 16px; background: #C397C4; font-family: Archivo, 'Arial Narrow', Arial, sans-serif; } .ds-flavors legend { float: left; width: 100%; margin-bottom: 0.75rem; font-size: 0.8125rem; font-weight: 800; font-stretch: 118%; letter-spacing: 0.1em; text-transform: uppercase; color: #17131A; } .ds-chip { position: relative; display: grid; place-items: center; width: 11.5rem; aspect-ratio: 168 / 112; color: var(--chip-ink); cursor: pointer; transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); } .ds-chip input { position: absolute; z-index: 1; inset: 0; margin: 0; opacity: 0; cursor: pointer; } .ds-chip-cup { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: var(--chip-fill); stroke: #17131A; stroke-width: 3; stroke-linejoin: round; filter: drop-shadow(0 8px 10px rgb(58 34 64 / 0.22)); transition: filter 0.35s cubic-bezier(0.16, 1, 0.3, 1); } .ds-chip-name { position: relative; margin-top: 0.9rem; padding: 0 1.25rem; font-size: 0.8125rem; font-weight: 800; font-stretch: 118%; letter-spacing: 0.04em; line-height: 1.1; text-align: center; text-transform: uppercase; } .ds-chip-sparkle { position: absolute; top: -0.35rem; right: 0.35rem; width: 1.5rem; fill: #17131A; opacity: 0; transform: scale(0.4) rotate(-30deg); transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1); } .ds-chip:hover { transform: translateY(-3px); } .ds-chip:has(input:checked) { transform: translateX(-0.6rem) scale(1.04); } .ds-chip:has(input:checked) .ds-chip-cup { stroke-width: 4.5; filter: drop-shadow(0 14px 14px rgb(58 34 64 / 0.32)); } .ds-chip:has(input:checked) .ds-chip-sparkle { opacity: 1; transform: scale(1) rotate(0deg); } .ds-chip:has(input:focus-visible) { outline: 3px solid #17131A; outline-offset: 5px; border-radius: 12px; } @media (prefers-reduced-motion: reduce) { .ds-chip, .ds-chip-cup, .ds-chip-sparkle { transition: none; } }"
-    },
-    {
       "name": "Concept Tag",
       "kind": "chip",
       "refersTo": "concept-tag",
@@ -387,17 +379,9 @@
       "name": "Masthead",
       "kind": "nav",
       "refersTo": "concept-tag",
-      "description": "Wordmark left; concept tag and underlined motion toggle right. No navigation links.",
-      "html": "<header class=\"ds-mast\"><p class=\"ds-mark\">Cuppy <span>Ice Cream</span></p><div class=\"ds-tools\"><p class=\"ds-mast-tag\">Internal concept</p><button type=\"button\" class=\"ds-motion\" aria-pressed=\"false\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" aria-hidden=\"true\"><rect x=\"14\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/><rect x=\"6\" y=\"4\" width=\"4\" height=\"16\" rx=\"1\"/></svg><span>Pause motion</span></button></div></header>",
-      "css": ".ds-mast { display: flex; align-items: center; justify-content: space-between; gap: 1rem; height: 4.5rem; padding: 0 clamp(1rem, 3.2vw, 2.75rem); background: #C397C4; color: #17131A; font-family: Archivo, 'Arial Narrow', Arial, sans-serif; } .ds-mark { margin: 0; font-size: 1.375rem; font-weight: 900; font-stretch: 125%; letter-spacing: -0.01em; line-height: 1; text-transform: uppercase; } .ds-mark span { margin-left: 0.35em; font-size: 0.55em; font-weight: 700; letter-spacing: 0.12em; vertical-align: 0.3em; } .ds-tools { display: flex; align-items: center; gap: 0.75rem; } .ds-mast-tag { margin: 0; padding: 0.35rem 0.7rem; border: 2px solid #17131A; border-radius: 999px; font-size: 0.75rem; font-weight: 700; font-stretch: 112%; letter-spacing: 0.08em; line-height: 1.1; text-transform: uppercase; } .ds-motion { display: inline-flex; align-items: center; gap: 0.45rem; min-height: 2.75rem; padding: 0 0.25rem; border: 0; background: none; color: inherit; font: inherit; font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.3em; } .ds-motion svg { width: 1rem; height: 1rem; } .ds-motion:hover { text-decoration-color: transparent; } .ds-motion:focus-visible { outline: 3px solid #17131A; outline-offset: 4px; border-radius: 6px; }"
-    },
-    {
-      "name": "Flavor Band",
-      "kind": "card",
-      "refersTo": "flavor-band-chocolate",
-      "description": "Full-bleed section that takes the selected flavor's field and ink, with the stepped ritual list.",
-      "html": "<section class=\"ds-band\" style=\"--flavor-field:#58362E;--flavor-ink:#F2E6D2\"><div class=\"ds-band-copy\"><h2>Chocolate</h2><p>Dark, deep, a little dramatic. Every lift leaves a ribbon behind.</p></div><ol class=\"ds-ritual\"><li>Dig in.</li><li><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 0C12.9 7.5 16.5 11.1 24 12C16.5 12.9 12.9 16.5 12 24C11.1 16.5 7.5 12.9 0 12C7.5 11.1 11.1 7.5 12 0Z\"/></svg>Lift slow.</li><li><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 0C12.9 7.5 16.5 11.1 24 12C16.5 12.9 12.9 16.5 12 24C11.1 16.5 7.5 12.9 0 12C7.5 11.1 11.1 7.5 12 0Z\"/></svg>Let it stretch.</li></ol></section>",
-      "css": ".ds-band { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: end; gap: clamp(2rem, 5vw, 5rem); padding: clamp(4rem, 9vw, 7.5rem) clamp(1rem, 3.2vw, 2.75rem); background: var(--flavor-field); color: var(--flavor-ink); font-family: Archivo, 'Arial Narrow', Arial, sans-serif; transition: background-color 0.6s cubic-bezier(0.16, 1, 0.3, 1), color 0.6s cubic-bezier(0.16, 1, 0.3, 1); } .ds-band-copy { display: grid; gap: 1.5rem; } .ds-band h2 { margin: 0; font-size: clamp(2.75rem, 8.4vw, 7.5rem); font-weight: 900; font-stretch: 125%; letter-spacing: -0.03em; line-height: 0.88; text-transform: uppercase; } .ds-band-copy p { margin: 0; max-width: 30ch; font-size: clamp(1.125rem, 1.7vw, 1.5rem); line-height: 1.4; } .ds-ritual { display: grid; gap: 0.2em; margin: 0; padding: 0; font-size: clamp(1.75rem, 3.6vw, 3.25rem); font-weight: 800; font-stretch: 112%; letter-spacing: -0.015em; line-height: 1.05; list-style: none; text-transform: uppercase; } .ds-ritual li { display: flex; align-items: center; gap: 0.35em; } .ds-ritual li:nth-child(2) { padding-left: 1.1em; } .ds-ritual li:nth-child(3) { padding-left: 2.2em; } .ds-ritual svg { flex: none; width: 0.6em; fill: currentColor; } @media (max-width: 959px) { .ds-band { grid-template-columns: minmax(0, 1fr); } }"
+      "description": "Wordmark left; concept tag right. No navigation links and no in-page controls.",
+      "html": "<header class=\"ds-mast\"><p class=\"ds-mark\">Cuppy <span>Ice Cream</span></p><p class=\"ds-mast-tag\">Internal concept</p></header>",
+      "css": ".ds-mast { display: flex; align-items: center; justify-content: space-between; gap: 1rem; height: 4.5rem; padding: 0 clamp(1rem, 3.2vw, 2.75rem); background: #C397C4; color: #17131A; font-family: Archivo, 'Arial Narrow', Arial, sans-serif; } .ds-mark { margin: 0; font-size: 1.375rem; font-weight: 900; font-stretch: 125%; letter-spacing: -0.01em; line-height: 1; text-transform: uppercase; } .ds-mark span { margin-left: 0.35em; font-size: 0.55em; font-weight: 700; letter-spacing: 0.12em; vertical-align: 0.3em; } .ds-mast-tag { margin: 0; padding: 0.35rem 0.7rem; border: 2px solid #17131A; border-radius: 999px; font-size: 0.75rem; font-weight: 700; font-stretch: 112%; letter-spacing: 0.08em; line-height: 1.1; text-transform: uppercase; }"
     },
     {
       "name": "Sparkle",
@@ -410,14 +394,13 @@
   ],
   "narrative": {
     "northStar": "The Product Is the Headline",
-    "overview": "A drenched lavender ground carries ink type so wide and heavy that it reads as a printed cup band. The product does not sit beside the copy; a real 3D soft-serve cup floats inside the sentence, between the lead line and a full-bleed pedestal word, and its soft plum contact shadow lands on the letters below it. Everything else (pitch, CTA, flavor chips) is small, quiet, and pinned to the edges so the cup and the word own the first viewport.\n\nDensity is low and the voice is loud only at display size. Color is the brand's own: lavender as the field, ink for type, outlines and buttons, cream only where it can be read (on ink or chocolate). Chocolate and caramel are not accents; they are whole fields that the page floods into when a flavor is picked. Ink four-point sparkles are the world's ornament and appear on the page, the chips, the ritual list and the printed cup label.\n\nMotion is soft and physical, and the signature moment is the pull, driven by the page's own scroll: a spoon lifts the real top of the swirl and stays where it was in the document while the cup travels down with the reader, so a continuous ribbon of cream stretches the length of the page and reassembles on the way back. Around it: a slow bob and pointer tilt at rest, a cubic ease-out (`cubic-bezier(0.16, 1, 0.3, 1)`) on every UI transition, and a damped squash-wobble re-tint on a flavor change. Reduced motion gets one composed 3D still instead of the scroll scene. (The flavor-band component snippet below predates the flavor panel; DESIGN.md describes the current panel.)",
+    "overview": "A drenched lavender ground carries ink type so wide and heavy that it reads as a printed cup band. The product does not sit beside the copy; a real 3D soft-serve cup floats inside the sentence, between the lead line and a full-bleed pedestal word, and its soft plum contact shadow lands on the letters below it. Everything else (the pitch and its CTA) is small, quiet, and pinned to the edge so the cup and the word own the first viewport. One art-directed product, the vanilla swirl; no flavor choice.\n\nDensity is low and the voice is loud only at display size. Color is the brand's own: lavender as the field, ink for type, outlines and buttons, cream only where it can be read (on ink or chocolate). Chocolate and caramel stay in the measured palette but are unused since the flavor selector was removed. Ink four-point sparkles are the world's ornament and appear on the page, the ritual list and the printed cup label.\n\nMotion is soft and physical, and the signature moment is the pull, driven by the page's own scroll: a spoon lifts the real top of the swirl and stays where it was in the document while the cup travels down with the reader, so a continuous ribbon of cream stretches the length of the page, drawing down the cream left in the cup, and reassembles on the way back. Around it: a slow bob and pointer tilt at rest, a cubic ease-out (`cubic-bezier(0.16, 1, 0.3, 1)`) on every UI transition. The visitor's prefers-reduced-motion setting is the only motion switch; reduced motion gets one composed 3D still and a short reading layout instead of the scroll scene.",
     "keyCharacteristics": [
       "Lavender field, ink type, cream only on dark fields.",
       "Archivo at 125% width, weight 900, uppercase, tight negative tracking for display.",
       "The 3D cup sits in the headline, not beside it.",
-      "Cup-silhouette flavor chips with ink outlines.",
       "Ink four-point sparkles as the only ornament.",
-      "Flavor choice re-tints the object and floods the next section."
+      "The cream in the cup drains into the strand as the page scrolls."
     ],
     "rules": [
       {
@@ -427,7 +410,7 @@
       },
       {
         "name": "The Flavor Is a Field Rule",
-        "body": "Flavor colors arrive as full-width fields and chip fills, each paired with its contrast ink (vanilla: ink, chocolate: cream, caramel: ink). They are not sprinkled as accents on the lavender hero.",
+        "body": "If flavor colors return, they arrive as full-width fields, each paired with its contrast ink (vanilla: ink, chocolate: cream, caramel: ink), never sprinkled as accents on the lavender hero.",
         "section": "colors"
       },
       {
@@ -448,7 +431,6 @@
     ],
     "dos": [
       "Do set every display line in Archivo at 125% width, weight 900, uppercase, with negative tracking.",
-      "Do pair each flavor field with its measured contrast ink: cream on chocolate, ink on vanilla and caramel.",
       "Do keep the product inside the headline composition, with its contact shadow landing on the type.",
       "Do use the ink four-point sparkle as the ornament, in ink or `currentColor`.",
       "Do run every UI transition on `cubic-bezier(0.16, 1, 0.3, 1)` and drop it under `prefers-reduced-motion`; give the 3D object a composed still pose, not a frozen frame.",

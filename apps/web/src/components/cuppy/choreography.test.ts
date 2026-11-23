@@ -4,11 +4,15 @@ import {
   BEND_SPRING,
   beatsFor,
   choreograph,
+  creamLeft,
   cupViewportBox,
+  cupWallRadius,
   liftIntegral,
+  PRODUCT,
   projectToViewport,
   spoonLocalPose,
   stepSpring,
+  SWIRL_CUT_V,
   TUG_SPRING,
   type StageMetrics,
 } from "./choreography";
@@ -120,6 +124,69 @@ describe.each([
         const box = cupViewportBox(choreograph(s, resized), resized);
         expect(box.top).toBeGreaterThanOrEqual(0);
         expect(box.bottom).toBeLessThanOrEqual(visibleHeight);
+      }
+    }
+  });
+});
+
+describe.each([
+  ["desktop", DESKTOP],
+  ["phone", PHONE],
+])("cream left in the cup on %s", (_, metrics) => {
+  const beats = beatsFor(metrics.height);
+  const swirl = buildSwirl({ height: PRODUCT.swirlHeight });
+  const { base } = splitSwirl(swirl, SWIRL_CUT_V);
+  const baseTop = Math.max(...base.positions.filter((_, i) => i % 3 === 1));
+  /** Height of cream showing above the rim, as a share of the untouched swirl's. */
+  const showing = (drawn: number) => {
+    const left = creamLeft(drawn);
+    const top = PRODUCT.swirlBase - left.sink + baseTop * left.tall;
+    const full = PRODUCT.swirlBase + baseTop;
+    return (top - PRODUCT.cupTop) / (full - PRODUCT.cupTop);
+  };
+  const at = (s: number) => choreograph(s, metrics).drawn;
+
+  it("is full until the spoon has the top", () => {
+    for (const s of [0, beats.hover, beats.dig, beats.cradle]) expect(at(s)).toBe(0);
+    expect(showing(0)).toBe(1);
+  });
+
+  it("drains steadily: visibly less by mid-scroll, only a little at the bottom", () => {
+    let previous = -1;
+    for (const s of range(metrics)) {
+      const drawn = at(s);
+      expect(drawn, `drawn at ${s}`).toBeGreaterThanOrEqual(previous);
+      previous = drawn;
+    }
+    expect(showing(at(metrics.maxScroll / 2))).toBeLessThan(0.6);
+    expect(showing(at(metrics.maxScroll / 2))).toBeGreaterThan(0.3);
+    expect(showing(at(metrics.maxScroll))).toBeLessThan(0.2);
+    expect(showing(at(metrics.maxScroll))).toBeGreaterThan(0.05);
+  });
+
+  it("fills back up exactly when scrolling back", () => {
+    const s = metrics.maxScroll * 0.6;
+    const down = at(s);
+    at(metrics.maxScroll);
+    expect(at(s)).toBe(down);
+    expect(at(0)).toBe(0);
+  });
+});
+
+describe("cream left in the cup", () => {
+  it("settles inside the paper and never pushes out through the wall", () => {
+    const swirl = buildSwirl({ height: PRODUCT.swirlHeight });
+    const { base } = splitSwirl(swirl, SWIRL_CUT_V);
+    for (let d = 0; d <= 1.0001; d += 0.02) {
+      const left = creamLeft(d);
+      for (let i = 0; i < base.positions.length; i += 3) {
+        const y = PRODUCT.swirlBase - left.sink + base.positions[i + 1] * left.tall;
+        // Below the rolled rim the cream must stay inside the wall.
+        if (y >= PRODUCT.cupTop) continue;
+        const r = Math.hypot(base.positions[i], base.positions[i + 2]) * left.wide;
+        expect(r, `radius at drawn ${d.toFixed(2)}, y ${y.toFixed(2)}`).toBeLessThan(
+          cupWallRadius(y) + 0.02,
+        );
       }
     }
   });
