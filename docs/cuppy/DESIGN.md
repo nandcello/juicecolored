@@ -118,7 +118,7 @@ components:
 
 # Design System: Cuppy (concept)
 
-> Scope and rights. This system covers only the `/cuppy` route (`apps/web/src/app/(cuppy)/`), which has its own root layout. It does not describe the JuiceColored portfolio and must not be applied to it. The Cuppy name, mascot cues, palette and site copy are owned by Cuppy Ice Cream; **publication permission is pending**. Provenance, sources and rights status live in [README.md](./README.md); the measured palette is in [brand-palette.json](./brand-palette.json). Token extensions (motion, shadows, 3D material and lighting, component snippets) are in [design.json](./design.json).
+> Scope and rights. This system covers only the `/concepts/cuppy` route (`apps/web/src/app/(cuppy)/`), which has its own root layout. It does not describe the JuiceColored portfolio and must not be applied to it. The Cuppy name, mascot cues, palette and site copy are owned by Cuppy Ice Cream; **publication permission is pending**. Provenance, sources and rights status live in [README.md](./README.md); the measured palette is in [brand-palette.json](./brand-palette.json). Token extensions (motion, shadows, 3D material and lighting, component snippets) are in [design.json](./design.json).
 
 ## Overview
 

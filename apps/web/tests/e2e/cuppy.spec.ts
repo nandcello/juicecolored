@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
+/** The concept lives under /concepts; the old /cuppy entry redirects here. */
+const CUPPY_PATH = "/concepts/cuppy";
+
 async function scene(page: Page) {
   return page.locator(".cuppy-scene").evaluate((element: HTMLElement) => ({
     phase: element.dataset.phase,
@@ -110,7 +113,7 @@ test("serves the Cuppy concept with one art-directed cream and no in-page contro
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  const response = await page.goto("/cuppy");
+  const response = await page.goto(CUPPY_PATH);
   expect(response?.status()).toBe(200);
   await expect(page).toHaveTitle("Cuppy — The scoop that stretches (concept)");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/The scoop that\s+stretches\./i);
@@ -137,10 +140,44 @@ test("serves the Cuppy concept with one art-directed cream and no in-page contro
   expect(errors).toEqual([]);
 });
 
+test("serves Cuppy at /concepts/cuppy, redirects only the old /cuppy entry, keeps its assets", async ({
+  page,
+  request,
+}) => {
+  const response = await page.goto(CUPPY_PATH);
+  expect(response?.status()).toBe(200);
+  expect(new URL(page.url()).pathname).toBe(CUPPY_PATH);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    "href",
+    "https://juicecolored.com/concepts/cuppy",
+  );
+
+  // The old entry, with or without its slash, moves permanently and exactly.
+  for (const old of ["/cuppy", "/cuppy/"]) {
+    const moved = await request.get(old, { maxRedirects: 0 });
+    expect(moved.status(), old).toBe(308);
+    expect(new URL(moved.headers().location, "http://local").pathname, old).toBe(CUPPY_PATH);
+  }
+  // Public assets that share the old prefix stay where they are.
+  for (const asset of ["/cuppy/poster-rest.webp", "/cuppy/poster-still.webp"]) {
+    const served = await request.get(asset, { maxRedirects: 0 });
+    expect(served.status(), asset).toBe(200);
+    expect(served.headers()["content-type"], asset).toContain("image/webp");
+  }
+  expect((await request.get("/cuppy/not-a-page", { maxRedirects: 0 })).status()).toBe(404);
+
+  // Posters resolve from the deeper route (absolute paths, not relative to the page).
+  const poster = page.locator(".cuppy-stage picture img");
+  await expect(poster).toHaveAttribute("src", "/cuppy/poster-rest.webp");
+  await expect
+    .poll(() => poster.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
+    .toBe(true);
+});
+
 test("Cuppy plays the scoop and stretch from native scroll, and reverses", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/cuppy");
+  await page.goto(CUPPY_PATH);
   await expect(page.locator(".cuppy")).toHaveAttribute("data-scene", "live", { timeout: 30_000 });
   await expect.poll(async () => (await scene(page)).phase).toBe("rest");
 
@@ -183,7 +220,7 @@ test("Cuppy keeps a still product image without WebGL", async ({ page }) => {
         String(args[0]).startsWith("webgl") ? null : Reflect.apply(target, thisArg, args),
     });
   });
-  await page.goto("/cuppy");
+  await page.goto(CUPPY_PATH);
   await expect(page.locator(".cuppy-stage")).toHaveAttribute("data-status", "fallback");
   await expect(page.locator(".cuppy-poster")).toBeVisible();
   await expect(page.locator(".cuppy-scene")).toBeHidden();
@@ -203,7 +240,7 @@ test("Cuppy honors reduced motion from the first paint with a composed still", a
     }).observe(document, { childList: true, subtree: true });
   });
   const page = await context.newPage();
-  await page.goto(`${test.info().project.use.baseURL ?? ""}/cuppy`);
+  await page.goto(`${test.info().project.use.baseURL ?? ""}${CUPPY_PATH}`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.locator(".cuppy").getByRole("button")).toHaveCount(0);
   await expect(page.locator(".cuppy")).toHaveAttribute("data-motion", "still");
@@ -231,7 +268,7 @@ test("Cuppy follows a motion preference change while open, both ways, with one s
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/cuppy");
+  await page.goto(CUPPY_PATH);
   await expect(page.locator(".cuppy")).toHaveAttribute("data-scene", "live", { timeout: 30_000 });
   await scrollToFraction(page, 0.5);
   await expect.poll(async () => (await scene(page)).phase).toBe("stretch");
@@ -264,7 +301,7 @@ test("Cuppy follows a motion preference change while open, both ways, with one s
 test("Cuppy without script shows the still poster and a readable page", async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
-  await page.goto(`${test.info().project.use.baseURL ?? ""}/cuppy`);
+  await page.goto(`${test.info().project.use.baseURL ?? ""}${CUPPY_PATH}`);
   await expect(page.locator(".cuppy-poster")).toBeVisible();
   await expect(page.locator(".cuppy-scene")).toBeHidden();
   await expect(page.getByText("Still going.")).toBeHidden();
@@ -278,7 +315,7 @@ test("Cuppy keeps the phone layout clear of leftover controls", async ({ browser
     isMobile: true,
   });
   const page = await context.newPage();
-  await page.goto(`${test.info().project.use.baseURL ?? ""}/cuppy`);
+  await page.goto(`${test.info().project.use.baseURL ?? ""}${CUPPY_PATH}`);
   await expect(page.locator(".cuppy")).toHaveAttribute("data-scene", "live", { timeout: 30_000 });
   await expect(page.locator(".cuppy").locator("fieldset, input, button")).toHaveCount(0);
   const cta = page.getByRole("link", { name: /Follow @cuppyicecream/ }).first();
@@ -318,7 +355,7 @@ test("Cuppy gives the phone hero cup and shadow their own room above the word", 
       });
       if (variant === "poster") await context.addInitScript(refuseWebGL);
       const page = await context.newPage();
-      await page.goto(`${base}/cuppy`);
+      await page.goto(`${base}${CUPPY_PATH}`);
       if (variant === "live") {
         await expect(page.locator(".cuppy")).toHaveAttribute("data-scene", "live", {
           timeout: 30_000,
@@ -384,7 +421,7 @@ test("Cuppy's face acts out the pull and holds one final reaction at the bottom"
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/cuppy");
+  await page.goto(CUPPY_PATH);
   await expect(page.locator(".cuppy")).toHaveAttribute("data-scene", "live", { timeout: 30_000 });
   await expect.poll(async () => (await face(page)).expression).toBe("rest");
   const restPose = (await face(page)).pose;
@@ -424,7 +461,7 @@ test("Cuppy's face acts out the pull and holds one final reaction at the bottom"
 });
 
 test("Cuppy's face lands the same after quick jumps and a resize", async ({ page }) => {
-  await page.goto("/cuppy");
+  await page.goto(CUPPY_PATH);
   await expect(page.locator(".cuppy")).toHaveAttribute("data-scene", "live", { timeout: 30_000 });
   // Stepping down and jumping straight there give the same final pose.
   for (const fraction of [0.2, 0.4, 0.6, 0.8]) await scrollToFraction(page, fraction);
@@ -463,7 +500,7 @@ test("Cuppy's face holds still at the bottom on a touch phone", async ({ browser
     hasTouch: true,
   });
   const page = await context.newPage();
-  await page.goto(`${test.info().project.use.baseURL ?? ""}/cuppy`);
+  await page.goto(`${test.info().project.use.baseURL ?? ""}${CUPPY_PATH}`);
   await expect(page.locator(".cuppy")).toHaveAttribute("data-scene", "live", { timeout: 30_000 });
   await scrollToBottom(page);
   await expect.poll(async () => (await face(page)).expression).toBe("final");
@@ -482,7 +519,7 @@ test("Cuppy's face holds still at the bottom on a touch phone", async ({ browser
 });
 
 test("Cuppy's still face follows a live reduced-motion change", async ({ page }) => {
-  await page.goto("/cuppy");
+  await page.goto(CUPPY_PATH);
   await expect(page.locator(".cuppy")).toHaveAttribute("data-scene", "live", { timeout: 30_000 });
   await scrollToBottom(page);
   await expect.poll(async () => (await face(page)).expression).toBe("final");

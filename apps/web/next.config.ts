@@ -43,7 +43,12 @@ const config: NextConfig = {
     return webpackConfig;
   },
   async redirects() {
-    return [{ source: "/calceldt/admin", destination: "/canceldt/admin", permanent: true }];
+    return [
+      { source: "/calceldt/admin", destination: "/canceldt/admin", permanent: true },
+      // Cuppy moved under /concepts. Only the old page entry moves; /cuppy/* assets stay.
+      { source: "/cuppy", destination: "/concepts/cuppy", permanent: true },
+      { source: "/cuppy/", destination: "/concepts/cuppy", permanent: true },
+    ];
   },
   async headers() {
     return [

@@ -21,7 +21,7 @@ import {
 import { createStrandBuffers, writeStrand } from "./strand";
 import { buildSwirl, splitSwirl } from "./swirl";
 
-// Measured from the real /cuppy layout at these viewports.
+// Measured from the real /concepts/cuppy layout at these viewports.
 const DESKTOP: StageMetrics = {
   width: 1440,
   height: 900,

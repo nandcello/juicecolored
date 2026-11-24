@@ -1,6 +1,6 @@
 # Cuppy concept: reference and provenance
 
-Internal design concept for **Cuppy Ice Cream**, built as the `/cuppy` route of the JuiceColored web app (`apps/web/src/app/(cuppy)/`). It is not a Cuppy-operated page, is `noindex`, and must not be published without the owner's permission.
+Internal design concept for **Cuppy Ice Cream**, built as the `/concepts/cuppy` route of the JuiceColored web app (`apps/web/src/app/(cuppy)/concepts/cuppy/`). The old `/cuppy` entry (with or without a trailing slash) permanently redirects there; the `/cuppy/*` public assets keep their paths. It is not a Cuppy-operated page, is `noindex`, and must not be published without the owner's permission.
 
 ## Rights status
 
