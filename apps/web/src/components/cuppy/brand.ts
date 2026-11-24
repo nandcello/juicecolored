@@ -8,4 +8,4 @@ export const CUPPY_INSTAGRAM_URL = "https://www.instagram.com/cuppyicecream/";
 export const CREAM = { base: "#F4E4C4", sheen: "#FFF7E8" } as const;
 
 export const PRODUCT_ALT =
-  "An original 3D render of a Cuppy paper cup, printed with pixel sunglasses, topped with a tall vanilla soft-serve swirl.";
+  "An original 3D render of a Cuppy paper cup printed with a cartoon face in pixel sunglasses, topped with a tall vanilla soft-serve swirl.";

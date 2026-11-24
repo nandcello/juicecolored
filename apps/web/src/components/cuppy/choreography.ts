@@ -327,6 +327,53 @@ export function projectToViewport(
   };
 }
 
+/** The cup's contact shadow on its ground plane, in the cup's frame (world units). */
+export type ShadowShape = {
+  /** Height of the shadow plane above the ground line. */
+  rise: number;
+  /** Offset away from the key light. */
+  offsetX: number;
+  offsetZ: number;
+  /** Radius out to which the soft pool is still visible. */
+  radius: number;
+};
+
+/** Vertical extent of the cast shadow on screen, in viewport px. */
+export function shadowFootprint(
+  frame: Pick<Choreography, "cup" | "ppu" | "cameraY" | "cameraDistance">,
+  metrics: Pick<StageMetrics, "width" | "height">,
+  shape: ShadowShape,
+) {
+  const at = (dz: number) =>
+    projectToViewport(
+      {
+        x: frame.cup.x + shape.offsetX,
+        y: frame.cup.y + shape.rise,
+        z: frame.cup.z + shape.offsetZ + dz,
+      },
+      frame,
+      metrics,
+    ).y;
+  const near = at(shape.radius);
+  const far = at(-shape.radius);
+  return { top: Math.min(near, far), bottom: Math.max(near, far) };
+}
+
+/**
+ * How much of the cast shadow may show, 0..1, given where the hero word is on
+ * screen. Full while there is open space between them; it eases out as the
+ * word scrolls into the shadow's band and back in once the word has passed,
+ * so the shadow never sits on the letters.
+ */
+export function wordClearanceFade(
+  footprint: { top: number; bottom: number },
+  word: { top: number; bottom: number },
+  ramp = 24,
+) {
+  const gap = Math.max(word.top - footprint.bottom, footprint.top - word.bottom);
+  return smoothstep(0, ramp, gap);
+}
+
 /** Approximate on-screen box of the cup and what remains of its swirl. */
 export function cupViewportBox(frame: Choreography, metrics: StageMetrics) {
   const half = PRODUCT.width / 2;

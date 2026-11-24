@@ -129,7 +129,7 @@ html {
   display: flex;
   flex: 1;
   flex-direction: column;
-  /* The scene puts its ground line 10% above the stage's bottom edge. */
+  /* The scene puts its ground line 7% of the stage's height above its bottom edge. */
   --cuppy-stage-h: calc(100% - var(--cuppy-lead-size) * 0.6);
 }
 
@@ -169,7 +169,8 @@ html {
   white-space: nowrap;
 }
 
-/* The canvas floats above the word so the cup's shadow lands on the letters. */
+/* The canvas floats above the word. On wide screens the cup's shadow lands on
+   the letters; narrow screens give the cup and its shadow their own room. */
 .cuppy-stage {
   position: absolute;
   z-index: 2;
@@ -577,18 +578,32 @@ html {
     --cuppy-stage-h: calc(
       clamp(18rem, 50svh, 32rem) + var(--cuppy-lead-size) * 1.9 + var(--cuppy-word-size) * 0.4
     );
+    /* Open lavender between the cup's shadow and the word. The ground line,
+       and so the shadow, sits this far above the word's cap height
+       (about 0.76 of the word size above the headline's bottom). */
+    --cuppy-ground-clear: clamp(1.5rem, 6.5vw, 2.25rem);
+    /* How far that is above the wide layout's ground line, which sits in the word. */
+    --cuppy-ground-lift: calc(
+      var(--cuppy-word-size) * 0.26 + var(--cuppy-stage-h) * 0.03 + var(--cuppy-ground-clear)
+    );
   }
 
   .cuppy-title {
     flex: none;
   }
 
+  /* The gap grows by the lift, so the cup keeps its place under the lead and
+     the word moves down instead. Pure layout: the poster, the live scene and
+     the reduced-motion still all get the room from the first paint. */
   .cuppy-title-gap {
     flex: none;
-    height: clamp(18rem, 50svh, 32rem);
+    height: calc(clamp(18rem, 50svh, 32rem) + var(--cuppy-ground-lift));
   }
 
   .cuppy-stage {
+    bottom: calc(
+      var(--cuppy-word-size) * 0.5 - var(--cuppy-stage-h) * 0.1 + var(--cuppy-ground-lift)
+    );
     width: min(100vw, 34rem);
   }
 

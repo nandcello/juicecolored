@@ -50,14 +50,17 @@ import {
   cupWallRadius,
   PRODUCT,
   projectToViewport,
+  shadowFootprint,
   TUG_SPRING,
   stepSpring,
   SWIRL_CUT_V,
   type Spring,
   type Choreography,
   type StageMetrics,
+  wordClearanceFade,
 } from "./choreography";
 import { CREAM } from "./brand";
+import { blinkAt, browFlashAt, drawFace, faceAt, faceSignature, type FaceFrame } from "./face";
 import { buildBowl, buildHandle, SPOON } from "./spoon";
 import { createStrandBuffers, writeStrand, type StrandInput } from "./strand";
 import { buildSwirl, splitSwirl, weldSeamNormals, type SwirlPiece } from "./swirl";
@@ -104,6 +107,24 @@ const SHADOW_SOFT = 2.5;
 const SHADOW_CORE = 1.25;
 const SHADOW_RISE = 0.16;
 const SHADOW_OFFSET = { x: 0.1, z: -0.12 } as const;
+/** The visible pool, for keeping it clear of the hero word (the falloff is near zero past 0.65 of its half-width). */
+/**
+ * The face is printed on a band of the cup's front wall: this far either side
+ * of the front (radians) and between these heights. Its canvas is redrawn only
+ * when the pose changes.
+ */
+const FACE_PHI = 0.8;
+const FACE_BOTTOM = 0.27;
+const FACE_TOP = 1.1;
+const FACE_CANVAS = { width: 800, height: 480 } as const;
+/** Where the face looks from, in the cup's frame: the bridge of the glasses. */
+const FACE_EYES = { y: 0.86, z: 0.95 } as const;
+const SHADOW_SHAPE = {
+  rise: SHADOW_RISE,
+  offsetX: SHADOW_OFFSET.x,
+  offsetZ: SHADOW_OFFSET.z,
+  radius: SHADOW_SOFT * 0.5 * 0.65,
+};
 
 function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
   const waist = size * 0.22;
@@ -115,15 +136,6 @@ function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, size: numb
   ctx.quadraticCurveTo(x - waist * 0.35, y - waist * 0.35, x, y - size);
   ctx.fill();
 }
-
-// Pixel sunglasses, an approved nod to the Cuppy mascot. X = frame, W = glint.
-const GLASSES = [
-  "XXXXXXXXXXXXXXXXXXXXXXXXXX",
-  "..XXWWXXXXXXXXXXWWXXXXXX..",
-  "..XXXWWXXXXX..XXXWWXXXXX..",
-  "...XXXXXXXX....XXXXXXXX...",
-  "....XXXXXX......XXXXXX....",
-];
 
 function drawLabel(fontFamily: string) {
   const width = 2048;
@@ -146,43 +158,33 @@ function drawLabel(fontFamily: string) {
   ctx.fillRect(0, 14, width, 10);
   ctx.fillRect(0, 34, width, 3);
 
-  // Bottom band with a repeating printed line.
+  // Bottom band with a repeating printed line; the wordmark sits at the front,
+  // under the face.
   const bandTop = height - 78;
   ctx.fillRect(0, bandTop, width, 78);
   ctx.fillStyle = PAPER;
-  ctx.font = `800 26px ${fontFamily}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   if ("fontStretch" in ctx) ctx.fontStretch = "expanded";
-  if ("letterSpacing" in ctx) ctx.letterSpacing = "4px";
   const step = width / 6;
-  for (let x = step / 2; x < width; x += step) {
-    ctx.fillText("ICE CREAM", x, bandTop + 40);
-    sparkle(ctx, x + step / 2, bandTop + 39, 9);
+  for (let k = -3; k <= 3; k++) {
+    const x = width / 2 + k * step;
+    const front = k === 0;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = front ? "3px" : "4px";
+    ctx.font = front ? `900 36px ${fontFamily}` : `800 26px ${fontFamily}`;
+    ctx.fillText(front ? "CUPPY" : "ICE CREAM", x, bandTop + 40);
+    if (k < 3) sparkle(ctx, x + step / 2, bandTop + 39, 9);
   }
 
-  // Front: pixel sunglasses over the wordmark. u = 0.5 faces the camera.
-  const pixel = 13;
-  const glassesWidth = GLASSES[0].length * pixel;
-  const gx = width / 2 - glassesWidth / 2;
-  const gy = 120;
-  GLASSES.forEach((row, r) => {
-    for (let c = 0; c < row.length; c++) {
-      const cell = row[c];
-      if (cell === ".") continue;
-      ctx.fillStyle = cell === "W" ? "#FFFFFF" : INK;
-      ctx.fillRect(gx + c * pixel, gy + r * pixel, pixel + 0.5, pixel + 0.5);
-    }
-  });
-
+  // The front belongs to the face (face.ts, its own layer). Sparkles flank it,
+  // and the wordmark repeats on the back.
   ctx.fillStyle = INK;
   if ("letterSpacing" in ctx) ctx.letterSpacing = "2px";
   ctx.font = `900 64px ${fontFamily}`;
-  for (const x of [width / 2, 0, width]) ctx.fillText("CUPPY", x, 262);
-
-  sparkle(ctx, width / 2 - 250, 110, 22);
-  sparkle(ctx, width / 2 + 232, 214, 14);
-  sparkle(ctx, width / 2 + 280, 120, 9);
+  for (const x of [0, width]) ctx.fillText("CUPPY", x, 262);
+  sparkle(ctx, width / 2 - 318, 116, 22);
+  sparkle(ctx, width / 2 - 352, 196, 9);
+  sparkle(ctx, width / 2 + 330, 290, 14);
   for (const x of [width / 4, (width * 3) / 4]) {
     sparkle(ctx, x - 30, 150, 26);
     sparkle(ctx, x + 40, 250, 13);
@@ -447,7 +449,27 @@ export async function createCuppyScene(
     toneMapped: false,
   });
   const shadowCore = shadowSoft.clone();
+  // The face is ink and paper on the same card, so it takes the label's light.
+  const faceCanvas = document.createElement("canvas");
+  faceCanvas.width = FACE_CANVAS.width;
+  faceCanvas.height = FACE_CANVAS.height;
+  const faceContext = faceCanvas.getContext("2d");
+  const faceTexture = new CanvasTexture(faceCanvas);
+  faceTexture.colorSpace = SRGBColorSpace;
+  faceTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  textures.push(faceTexture);
+  const facePrint = new MeshStandardMaterial({
+    map: faceTexture,
+    roughness: 0.74,
+    metalness: 0,
+    transparent: true,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -4,
+  });
   const materials: Material[] = [
+    facePrint,
     paper,
     paperPlain,
     paperInside,
@@ -517,7 +539,8 @@ export async function createCuppyScene(
 
   const drips = new Group();
   for (const [angle, length] of [
-    [0.6, 0.46],
+    // The long drip runs down beside the face, not over it.
+    [1.02, 0.46],
     [-2.1, 0.24],
     [2.45, 0.32],
   ] as const) {
@@ -529,8 +552,22 @@ export async function createCuppyScene(
 
   // cupRoot sits on the ground line; float hovers and turns the product
   // around its middle.
+  const faceBand = new Mesh(
+    new LatheGeometry(
+      Array.from({ length: 9 }, (_, i) => {
+        const y = FACE_BOTTOM + ((FACE_TOP - FACE_BOTTOM) * i) / 8;
+        return new Vector2(wallRadius(y) + 0.004, y);
+      }),
+      48,
+      -FACE_PHI,
+      FACE_PHI * 2,
+    ),
+    facePrint,
+  );
+  faceBand.receiveShadow = true;
+
   const product = new Group();
-  product.add(outerWall, innerWall, foot, rimRoll, swirlPivot, drips);
+  product.add(outerWall, innerWall, foot, rimRoll, faceBand, swirlPivot, drips);
   product.position.y = -FLOAT_PIVOT;
   const float = new Group();
   float.position.y = PRODUCT.float + FLOAT_PIVOT;
@@ -607,6 +644,9 @@ export async function createCuppyScene(
   const bend: Spring = { value: 0, velocity: 0 };
   const tug: Spring = { value: 0, velocity: 0 };
   let reported = "";
+  let faceDrawn = "";
+  let face: FaceFrame | null = null;
+  const look = { x: 0, y: 0 };
 
   const tmp = {
     a: new Vector3(),
@@ -615,6 +655,8 @@ export async function createCuppyScene(
   };
   /** Document y where the ink close begins; the contact shadow fades out over it. */
   let darkTop = Infinity;
+  /** Document box of the hero word, which the narrow layout keeps clear of the shadow. */
+  let word = { top: Infinity, bottom: Infinity };
   let shadowFade = 1;
   const strandInput: StrandInput = {
     bottom: { x: 0, y: 0, z: 0 },
@@ -654,6 +696,10 @@ export async function createCuppyScene(
       maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       const dark = document.querySelector("[data-cuppy-dark]");
       darkTop = dark ? dark.getBoundingClientRect().top + window.scrollY : Infinity;
+      const title = document.querySelector(".cuppy-title-word")?.getBoundingClientRect();
+      word = title
+        ? { top: title.top + window.scrollY, bottom: title.bottom + window.scrollY }
+        : { top: Infinity, bottom: Infinity };
     } else {
       // The still pose needs headroom for the lifted spoon inside the slot.
       hero = {
@@ -713,6 +759,11 @@ export async function createCuppyScene(
     else scrollVelocity = 0;
 
     const frame = choreograph(scrollY, m);
+    const current = faceAt(scrollY, frame.beats, m.maxScroll);
+    face = current;
+    // Idle life (float, turn, pointer, ripple, springs, blinks) fades out as the
+    // final pose lands and is exactly zero at the bottom, so the pose holds still.
+    const idle = animate ? current.idle : 0;
     if (animate) elapsed += dt;
     const t = elapsed;
     const ease = 1 - Math.exp(-dt * 4);
@@ -721,7 +772,7 @@ export async function createCuppyScene(
 
     // Scroll springs: the strand bows while the page moves and wobbles when it
     // stops; a fast pull tugs the cup up a little against the cream.
-    const springs = animate && scrollMode;
+    const springs = animate && scrollMode && idle > 0;
     const holding = frame.holding;
     const bendTarget = springs && holding ? clampValue(scrollVelocity * 0.00022, -0.5, 0.5) : 0;
     const tugTarget =
@@ -734,30 +785,50 @@ export async function createCuppyScene(
     } else {
       bend.value = bend.velocity = tug.value = tug.velocity = 0;
     }
+    const bendNow = bend.value * idle;
+    const tugNow = tug.value * idle;
 
-    const sway = frame.sway;
+    const sway = frame.sway * idle;
     const bob = animate ? Math.sin(t * 1.15) * 0.085 : 0;
-    const turn = animate ? Math.sin(t * 0.36) * 0.42 + pointer.x * 0.45 : 0.18;
+    // The turn stays small enough that the face on the front always reads.
+    const turn = animate ? Math.sin(t * 0.36) * 0.3 + pointer.x * 0.35 : 0.12;
     const unitPerPx = (frame.cameraDistance - frame.cup.z) / frame.cameraDistance / frame.ppu;
-    cupRoot.position.set(frame.cup.x, frame.cup.y - tug.value * unitPerPx, frame.cup.z);
+    cupRoot.position.set(frame.cup.x, frame.cup.y - tugNow * unitPerPx, frame.cup.z);
     float.position.y = PRODUCT.float + FLOAT_PIVOT + bob * sway;
     float.rotation.y = turn * sway;
     float.rotation.x = (animate ? pointer.y * 0.16 + Math.sin(t * 0.8) * 0.025 : 0.02) * sway;
     float.rotation.z =
-      (animate ? -pointer.x * 0.07 + Math.sin(t * 0.6) * 0.03 : 0) * sway - bend.value * 0.05;
+      (animate ? -pointer.x * 0.07 + Math.sin(t * 0.6) * 0.03 : 0) * sway - bendNow * 0.05;
     // A plum shadow on ink only bands, so it fades as the cup reaches the close.
     const groundDocY = scrollY + projectToViewport(frame.cup, frame, m).y;
     shadowFade = 1 - smoothstep01((groundDocY - darkTop + 60) / 220);
+    // Narrow screens: the cup holds still while the word scrolls up under it,
+    // so the shadow steps aside while the word crosses its band.
+    if (m.layout === "narrow") {
+      shadowFade *= wordClearanceFade(shadowFootprint(frame, m, SHADOW_SHAPE), {
+        top: word.top - scrollY,
+        bottom: word.bottom - scrollY,
+      });
+    }
     placeShadow(animate ? (bob * sway) / 0.085 : 0);
 
     spoon.position.set(frame.spoon.x, frame.spoon.y, frame.spoon.z);
-    spoon.rotation.set(frame.spoon.rx, frame.spoon.ry, frame.spoon.rz - bend.value * 0.04, "YXZ");
+    spoon.rotation.set(frame.spoon.rx, frame.spoon.ry, frame.spoon.rz - bendNow * 0.04, "YXZ");
 
     // The swirl left in the cup gives up its cream to the strand: it settles
     // into the cup as the pull lengthens, and fills back up on the way up.
+    // It moves with the face: the cream draws up a little as the strain
+    // builds and lets go with the final laugh, and on the float it squashes
+    // as the cup rises while the glasses lag behind.
     const left = creamLeft(frame.drawn);
+    const float01 = animate ? Math.sin(t * 1.15) * sway : 0;
+    const pullUp = 1 + 0.06 * current.tension;
     swirlPivot.position.y = PRODUCT.swirlBase - left.sink;
-    swirlPivot.scale.set(left.wide, left.tall, left.wide);
+    swirlPivot.scale.set(
+      left.wide * (1 + 0.006 * float01),
+      left.tall * pullUp * (1 - 0.014 * float01),
+      left.wide * (1 + 0.006 * float01),
+    );
 
     cupRoot.updateMatrixWorld(true);
     spoon.updateMatrixWorld(true);
@@ -803,8 +874,8 @@ export async function createCuppyScene(
         (m.height / 2) * ((frame.cameraDistance - frame.cup.z) / frame.cameraDistance / frame.ppu) +
         0.6;
       strandInput.time = t;
-      strandInput.sway = animate ? 1 : 0;
-      strandInput.bend = bend.value;
+      strandInput.sway = idle;
+      strandInput.bend = bendNow;
       strandInput.progress = frame.stretch;
       // The narrow cup sits deeper, so its units are smaller on screen.
       strandInput.wobbleScale = m.layout === "wide" ? 1 : 1 / Math.max(frame.cupScale, 0.4);
@@ -816,8 +887,53 @@ export async function createCuppyScene(
     }
 
     camera.position.set(0, frame.cameraY, frame.cameraDistance);
+    paintFace(frame, m, current, idle, t, float01);
     report(frame, m);
-    return moving || animate;
+    return moving || idle > 0;
+  }
+
+  /**
+   * Points the eyes and redraws the printed face if anything changed. The
+   * eyes find the spoon on screen, so the gaze is right on every layout; at
+   * rest they follow the pointer instead.
+   */
+  function paintFace(
+    frame: Choreography,
+    m: StageMetrics,
+    current: FaceFrame,
+    idle: number,
+    t: number,
+    float01: number,
+  ) {
+    const pose = current.pose;
+    const eyes = projectToViewport(
+      {
+        x: frame.cup.x,
+        y: frame.cup.y + PRODUCT.float + FACE_EYES.y,
+        z: frame.cup.z + FACE_EYES.z,
+      },
+      frame,
+      m,
+    );
+    const target = projectToViewport(frame.spoon, frame, m);
+    const dx = target.x - eyes.x;
+    const dy = target.y - eyes.y;
+    const reach = Math.hypot(dx, dy) || 1;
+    const spoonX = dx / reach;
+    const spoonY = dy / reach;
+    const pointerWeight = 0.55 * idle;
+    look.x = pointer.x * pointerWeight + (spoonX - pointer.x * pointerWeight) * pose.gaze;
+    look.y = pointer.y * pointerWeight + (spoonY - pointer.y * pointerWeight) * pose.gaze;
+    const blink = blinkAt(t) * idle;
+    // The resting brow flash belongs to the cool pose only.
+    const flash = browFlashAt(t) * idle * (1 - pose.gaze);
+    const drawn = flash > 0.002 ? { ...pose, brow: pose.brow + flash * 12 } : pose;
+    const nudge = -float01 * 5;
+    const signature = `${faceSignature(drawn, look, blink)},${Math.round(nudge * 4)}`;
+    if (signature === faceDrawn || !faceContext) return;
+    faceDrawn = signature;
+    drawFace(faceContext, drawn, { look, blink, nudge });
+    faceTexture.needsUpdate = true;
   }
 
   // Progress is published on the host for tests and debugging. A replaced
@@ -833,13 +949,20 @@ export async function createCuppyScene(
         ? "stretch"
         : "lift";
     const box = cupViewportBox(frame, m);
-    const next = `${phase}|${frame.stretch.toFixed(2)}|${frame.drawn.toFixed(2)}|${Math.round(box.top)}|${Math.round(box.bottom)}`;
+    const expression = face?.expression ?? "rest";
+    // The scroll-driven pose alone, without idle life: equal scroll, equal pose.
+    const pose = face ? faceSignature(face.pose, { x: 0, y: 0 }, 0) : "";
+    const next = `${phase}|${expression}|${pose}|${faceDrawn}|${frame.stretch.toFixed(2)}|${frame.drawn.toFixed(2)}|${shadowFade.toFixed(2)}|${Math.round(box.top)}|${Math.round(box.bottom)}`;
     if (next === reported && container.dataset.sceneOwner === owner) return;
     reported = next;
     container.dataset.sceneOwner = owner;
     container.dataset.phase = phase;
+    container.dataset.expression = expression;
+    container.dataset.pose = pose;
+    container.dataset.face = faceDrawn;
     container.dataset.stretch = frame.stretch.toFixed(2);
     container.dataset.drawn = frame.drawn.toFixed(2);
+    container.dataset.shadow = shadowFade.toFixed(2);
     container.dataset.cupTop = String(Math.round(box.top));
     container.dataset.cupBottom = String(Math.round(box.bottom));
   }
@@ -951,7 +1074,18 @@ export async function createCuppyScene(
       renderer.forceContextLoss();
       canvas.remove();
       if (container.dataset.sceneOwner === owner) {
-        for (const key of ["sceneOwner", "phase", "stretch", "drawn", "cupTop", "cupBottom"]) {
+        for (const key of [
+          "sceneOwner",
+          "phase",
+          "expression",
+          "pose",
+          "face",
+          "stretch",
+          "drawn",
+          "shadow",
+          "cupTop",
+          "cupBottom",
+        ]) {
           delete container.dataset[key];
         }
       }

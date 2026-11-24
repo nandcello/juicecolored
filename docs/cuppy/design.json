@@ -184,7 +184,7 @@
       {
         "name": "cup-contact",
         "value": "Gaussian radial falloff, rgb(40 20 48), alpha exp(-1.6 (r/0.46)^2) (1 - r^2), reaching 0 at the edge",
-        "purpose": "Two stacked ground planes under the 3D cup: soft 2.5 x 2.3 units at opacity 0.44, core 1.25 x 1.13 at 0.4; lifted 0.16 off the ground line and offset (0.1, -0.12) away from the key light; widening 4% and fading slightly as the cup bobs up; fading out over the ink close. Sized to the cup so it stays inside the phone lane."
+        "purpose": "Two stacked ground planes under the 3D cup: soft 2.5 x 2.3 units at opacity 0.44, core 1.25 x 1.13 at 0.4; lifted 0.16 off the ground line and offset (0.1, -0.12) away from the key light; widening 4% and fading slightly as the cup bobs up; fading out over the ink close. Sized to the cup so it stays inside the phone lane. Below 960px the ground line sits clamp(1.5rem, 6.5vw, 2.25rem) above the hero word (--cuppy-ground-lift), and the live scene fades the shadow while the word scrolls through its band (wordClearanceFade, 24px ramp), so it never overlaps the letters."
       }
     ],
     "motion": [
@@ -205,8 +205,8 @@
       },
       {
         "name": "cup-float",
-        "value": "bob sin(1.15t) * 0.085; yaw sin(0.36t) * 0.42 + pointer.x * 0.45; pitch pointer.y * 0.16 + sin(0.8t) * 0.025; roll -pointer.x * 0.07 + sin(0.6t) * 0.03; pointer smoothing 1 - exp(-4dt)",
-        "purpose": "Idle float and pointer tilt."
+        "value": "bob sin(1.15t) * 0.085; yaw sin(0.36t) * 0.30 + pointer.x * 0.35 (still pose 0.12); pitch pointer.y * 0.16 + sin(0.8t) * 0.025; roll -pointer.x * 0.07 + sin(0.6t) * 0.03; pointer smoothing 1 - exp(-4dt); all scaled by the face's idle factor, so zero at the bottom",
+        "purpose": "Idle float and pointer tilt, kept small so the printed face stays frontal."
       },
       {
         "name": "reduced-motion",
@@ -217,6 +217,16 @@
         "name": "cream-drain",
         "value": "drawn = 1 - (1 - p)^1.5, p = (scroll - cradle) / (maxScroll - cradle); sink 0.4d, tall 1 - 0.55d, wide 1 - 0.06 smoothstep(0, 0.05, d) - 0.09d",
         "purpose": "The cream left in the cup settles into it as the strand lengthens: about half shows above the rim at mid-scroll, a thin layer at the end; reverses exactly. Cream geometry only: no cup, scene-scale or opacity change."
+      },
+      {
+        "name": "face-acting",
+        "value": "pose-to-pose keys on scroll: rest 0-0.45 hover, anticipate at hover, contact at dig, scoop at cradle (glasses perk and tilt once), lift at anchor, curious at 30% of the pull, impressed at 62% and 88% (one brow climbing), final at the bottom (maxScroll - 2px); acting segments smoothstep, pull segments half smoothstep / half linear",
+        "purpose": "Cuppy's face (face.ts): wholesome curious-to-proud delight. Pure function of scroll: reverses exactly, no springs, no catch-up after jumps or resizes. Pupils reach 0.6 of the way up so a far spoon never reads as rolled-back eyes."
+      },
+      {
+        "name": "face-idle",
+        "value": "blink sin(pi u), 0.17s, about every 4.2s (deterministic); rest brow flash sin^2, 0.75s every 7.4s; glasses lag the float by -5 design units; cream squash tall 1 - 0.014 f, wide 1 + 0.006 f with the float; cream draws up 1 + 0.06 x the pull, settling at the final. idle = 1 - smoothstep over the last 12% of the pull",
+        "purpose": "Life on top of the scroll pose. Exactly zero within 2px of the bottom, where the frame loop stops and the final reaction holds still; pointer and taps do not stir it."
       }
     ],
     "breakpoints": [
@@ -431,7 +441,7 @@
     ],
     "dos": [
       "Do set every display line in Archivo at 125% width, weight 900, uppercase, with negative tracking.",
-      "Do keep the product inside the headline composition, with its contact shadow landing on the type.",
+      "Do keep the product inside the headline composition. On wide screens its contact shadow may land on the type; below 960px the cup and its shadow get their own room above the word.",
       "Do use the ink four-point sparkle as the ornament, in ink or `currentColor`.",
       "Do run every UI transition on `cubic-bezier(0.16, 1, 0.3, 1)` and drop it under `prefers-reduced-motion`; give the 3D object a composed still pose, not a frozen frame.",
       "Do keep a still render of the same model behind the live canvas so the object never disappears.",

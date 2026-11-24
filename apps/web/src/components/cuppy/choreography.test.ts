@@ -10,11 +10,13 @@ import {
   liftIntegral,
   PRODUCT,
   projectToViewport,
+  shadowFootprint,
   spoonLocalPose,
   stepSpring,
   SWIRL_CUT_V,
   TUG_SPRING,
   type StageMetrics,
+  wordClearanceFade,
 } from "./choreography";
 import { createStrandBuffers, writeStrand } from "./strand";
 import { buildSwirl, splitSwirl } from "./swirl";
@@ -179,15 +181,48 @@ describe("cream left in the cup", () => {
     const { base } = splitSwirl(swirl, SWIRL_CUT_V);
     for (let d = 0; d <= 1.0001; d += 0.02) {
       const left = creamLeft(d);
+      // Worst overshoot past the wall, below the rolled rim, at this amount drawn.
+      let worst = -Infinity;
       for (let i = 0; i < base.positions.length; i += 3) {
         const y = PRODUCT.swirlBase - left.sink + base.positions[i + 1] * left.tall;
-        // Below the rolled rim the cream must stay inside the wall.
         if (y >= PRODUCT.cupTop) continue;
         const r = Math.hypot(base.positions[i], base.positions[i + 2]) * left.wide;
-        expect(r, `radius at drawn ${d.toFixed(2)}, y ${y.toFixed(2)}`).toBeLessThan(
-          cupWallRadius(y) + 0.02,
-        );
+        worst = Math.max(worst, r - cupWallRadius(y));
       }
+      expect(worst, `overshoot at drawn ${d.toFixed(2)}`).toBeLessThan(0.02);
+    }
+  });
+});
+
+describe("shadow and hero word", () => {
+  const shape = { rise: 0.16, offsetX: 0.1, offsetZ: -0.12, radius: 0.8 };
+
+  it("projects the shadow as a thin band just under the floating cup", () => {
+    const frame = choreograph(0, PHONE);
+    const fp = shadowFootprint(frame, PHONE, shape);
+    const ground = projectToViewport(frame.cup, frame, PHONE).y;
+    const foot = projectToViewport(
+      { ...frame.cup, y: frame.cup.y + PRODUCT.float },
+      frame,
+      PHONE,
+    ).y;
+    expect(fp.top).toBeLessThan(fp.bottom);
+    expect(fp.top).toBeGreaterThan(foot - 20);
+    expect(fp.bottom).toBeLessThan(ground + 20);
+  });
+
+  it("keeps the full shadow with open space and drops it while the word crosses it", () => {
+    const fp = { top: 500, bottom: 520 };
+    expect(wordClearanceFade(fp, { top: 545, bottom: 580 })).toBe(1);
+    expect(wordClearanceFade(fp, { top: 510, bottom: 545 })).toBe(0);
+    expect(wordClearanceFade(fp, { top: 430, bottom: 470 })).toBe(1);
+    // Eases rather than snapping as the word approaches.
+    let previous = 0;
+    for (let top = 520; top <= 540; top += 1) {
+      const fade = wordClearanceFade(fp, { top, bottom: top + 35 });
+      expect(fade).toBeGreaterThanOrEqual(previous);
+      expect(fade - previous).toBeLessThan(0.2);
+      previous = fade;
     }
   });
 });
