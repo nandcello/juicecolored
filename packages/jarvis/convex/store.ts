@@ -1,4 +1,4 @@
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import { internalMutation, internalQuery, query, type MutationCtx } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { deviceState, sceneFields } from "./schema";
 import { requireGateway } from "./security";
@@ -340,22 +340,54 @@ export const rateLimit = internalMutation({
     return true;
   },
 });
+export const ACCOUNT_LEASE = "xiaomi-owner";
+const DEVICE_LEASE = "device:";
+async function activeLease(ctx: MutationCtx, key: string) {
+  const lease = await ctx.db
+    .query("leases")
+    .withIndex("by_key", (q) => q.eq("key", key))
+    .unique();
+  return lease && lease.expires > Date.now() ? lease : null;
+}
+async function claimLease(ctx: MutationCtx, key: string, token: string) {
+  const old = await ctx.db
+    .query("leases")
+    .withIndex("by_key", (q) => q.eq("key", key))
+    .unique();
+  if (old) await ctx.db.patch(old._id, { token, expires: Date.now() + 120000 });
+  else await ctx.db.insert("leases", { key, token, expires: Date.now() + 120000 });
+}
+// The account lease covers account-wide work and background fan movement. It
+// excludes every device lease, so it waits for in-flight device commands.
 export const acquire = internalMutation({
   args: { key: v.string(), token: v.string() },
   handler: async (ctx, { key, token }) => {
-    const old = await ctx.db
-      .query("leases")
-      .withIndex("by_key", (q) => q.eq("key", key))
-      .unique();
-    if (old && old.expires > Date.now()) return false;
-    if (old) await ctx.db.patch(old._id, { token, expires: Date.now() + 120000 });
-    else
-      await ctx.db.insert("leases", {
-        key,
-        token,
-        expires: Date.now() + 120000,
-      });
+    if (await activeLease(ctx, key)) return false;
+    if (key === ACCOUNT_LEASE) {
+      const devices = await ctx.db
+        .query("leases")
+        .withIndex("by_key", (q) => q.gte("key", DEVICE_LEASE).lt("key", "device;"))
+        .take(64);
+      if (devices.some((lease) => lease.expires > Date.now())) return false;
+    }
+    await claimLease(ctx, key, token);
     return true;
+  },
+});
+// Device commands and reads are serialized per device, so one slow device does
+// not block another. They still wait for account-wide work and fan movement.
+export const acquireDevice = internalMutation({
+  args: { id: v.id("devices"), token: v.string() },
+  returns: v.union(
+    v.object({ key: v.string() }),
+    v.object({ busy: v.union(v.literal("account"), v.literal("device")) }),
+  ),
+  handler: async (ctx, { id, token }) => {
+    if (await activeLease(ctx, ACCOUNT_LEASE)) return { busy: "account" as const };
+    const key = DEVICE_LEASE + id;
+    if (await activeLease(ctx, key)) return { busy: "device" as const };
+    await claimLease(ctx, key, token);
+    return { key };
   },
 });
 export const release = internalMutation({

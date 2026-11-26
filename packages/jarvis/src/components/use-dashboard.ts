@@ -1,38 +1,245 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Device, LightDevice, Scene, Snapshot } from "../lib/domain";
 import { request } from "../lib/client";
-import { expectedCommandState, matchesCommandState } from "../../command-state";
+import {
+  DeviceQueues,
+  IDLE_LANE,
+  type QueueHandlers,
+  type Outcome,
+  type Submission,
+} from "../lib/device-queue";
+import {
+  actionSettings,
+  expectedCommandState,
+  expectedSettingsState,
+  matchesCommandState,
+} from "../../command-state";
 
 export type View = "devices" | "scenes" | "activity" | "settings";
 export type Dialog = "connect" | "save" | "device" | "disconnect" | "help" | null;
+export type Feedback = { text: string; error: boolean };
+export type DeviceStatus = {
+  label?: string;
+  optimistic: boolean;
+  /** Changes are queued or being confirmed; the controls stay editable. */
+  saving: boolean;
+  directionPending: boolean;
+  refreshPending: boolean;
+  feedback?: Feedback;
+};
 type QR = { key: string; image: string; expires: number };
+// These can run while background fan movement owns the account lease.
+const DURING_MOTION = ["fanStop", "fanCheckEnd", "fanObserveEnd"];
+const UNCONFIRMED = "The requested change was not confirmed. Showing the last reported state.";
 
 export function useDashboard(initial: Snapshot) {
   const [state, setState] = useState(initial);
   const [selected, setSelected] = useState(initial.devices[0]?.id ?? "");
   const [view, setView] = useState<View>("devices");
   const [room, setRoom] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
+  // Account-wide work only (sign-in, discovery, settings, fan movement). Device
+  // commands never set this, so one device never puts the app in a loading state.
+  const [accountTask, setAccountTask] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Feedback | null>(null);
+  const [feedback, setFeedback] = useState<Record<string, Feedback>>({});
   const [dialog, setDialog] = useState<Dialog>(null);
   const [qr, setQR] = useState<QR | null>(null);
   const [region, setRegion] = useState(initial.region);
   const [stale, setStale] = useState(false);
   const [unverified, setUnverified] = useState<Set<string>>(() => new Set());
-  const [pending, setPending] = useState<{ id: string; label: string; optimistic?: Device } | null>(
-    null,
-  );
   const lastAttempt = useRef(new Map<string, number>());
-  const working = useRef(false);
+  const accountWorking = useRef(false);
   const alive = useRef(true);
-  const operationVersion = useRef(0);
+  const accountVersion = useRef(0);
+  // Snapshots are numbered when requested. A device ignores any snapshot that
+  // was requested before its latest command or read settled, so a stale
+  // response can never overwrite a newer confirmation.
+  const snapshotSeq = useRef(0);
+  const freshFrom = useRef(new Map<string, number>());
+  const [queues] = useState(() => new DeviceQueues());
+  const devicesRef = useRef(initial.devices);
+  useEffect(() => {
+    devicesRef.current = state.devices;
+  }, [state.devices]);
+  const lanes = useSyncExternalStore(queues.subscribe, queues.getSnapshot, queues.getSnapshot);
   const backgroundMoving = state.devices.some((d) => d.kind === "fan" && !!d.direction?.motion);
   const qrVersion = useRef(0);
+
+  function markUnverified(id: string, failed: boolean) {
+    setUnverified((previous) => {
+      if (previous.has(id) === failed) return previous;
+      const next = new Set(previous);
+      if (failed) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+  function setDeviceFeedback(id: string, value: Feedback | null) {
+    setFeedback((previous) => {
+      if (!value && !previous[id]) return previous;
+      const next = { ...previous };
+      if (value) next[id] = value;
+      else delete next[id];
+      return next;
+    });
+  }
+  async function loadSnapshot() {
+    const seq = ++snapshotSeq.current;
+    const next = await request<Snapshot>();
+    return { seq, next };
+  }
+  function applySnapshot(seq: number, next: Snapshot) {
+    setState((previous) => ({
+      ...next,
+      devices: next.devices.map((d) =>
+        seq < (freshFrom.current.get(d.id) ?? 0)
+          ? (previous.devices.find((p) => p.id === d.id) ?? d)
+          : d,
+      ),
+    }));
+  }
+
+  async function sendSubmission(id: string, submission: Submission) {
+    lastAttempt.current.set(id, Date.now());
+    if (submission.type === "refresh") return request({ type: "refresh", id });
+    if (submission.type === "command")
+      return request({
+        type: "control",
+        id,
+        action: submission.action,
+        data: submission.data,
+      });
+    return request({
+      type: "apply",
+      id,
+      settings: submission.settings,
+      ...(submission.duration !== undefined ? { duration: submission.duration } : {}),
+    });
+  }
+  async function settleSubmission(
+    id: string,
+    kind: Device["kind"],
+    submission: Submission,
+    outcome: Outcome,
+  ) {
+    lastAttempt.current.set(id, Date.now());
+    // Anything requested before this point predates the outcome for this device.
+    freshFrom.current.set(id, snapshotSeq.current + 1);
+    const expected =
+      submission.type === "refresh"
+        ? {}
+        : submission.type === "batch"
+          ? expectedSettingsState(kind, submission.settings)
+          : submission.expected;
+    let observed: Device | undefined;
+    let snapshotError: unknown;
+    try {
+      // A failed response can still have changed the device or its availability.
+      // Recover the recorded state without ever repeating the operation.
+      const { seq, next } = await loadSnapshot();
+      if (!alive.current) return;
+      applySnapshot(seq, next);
+      observed = next.devices.find((d) => d.id === id);
+    } catch (error) {
+      snapshotError = error;
+    }
+    if (!alive.current) return;
+    const quiet = submission.type === "refresh" && submission.automatic;
+    if (!outcome.ok) {
+      markUnverified(id, true);
+      if (snapshotError) setStale(true);
+      else if (quiet) setStale(true);
+      if (!quiet)
+        setDeviceFeedback(id, {
+          text:
+            outcome.error instanceof Error
+              ? outcome.error.message
+              : "Could not complete the request.",
+          error: true,
+        });
+      return;
+    }
+    if (snapshotError) {
+      markUnverified(id, true);
+      setStale(true);
+      if (!quiet)
+        setDeviceFeedback(id, {
+          text:
+            snapshotError instanceof Error
+              ? snapshotError.message
+              : "Could not confirm the device state.",
+          error: true,
+        });
+      return;
+    }
+    markUnverified(id, false);
+    setStale(false);
+    const predicted = Object.keys(expected).length > 0;
+    const warning =
+      (outcome.result.warning as string | undefined) ??
+      (predicted && (!observed?.online || !matchesCommandState(observed.state, expected))
+        ? UNCONFIRMED
+        : undefined);
+    if (warning) setDeviceFeedback(id, { text: warning, error: true });
+    else if (submission.type !== "refresh" || !submission.automatic)
+      setDeviceFeedback(
+        id,
+        submission.type !== "batch" && submission.message
+          ? { text: submission.message, error: false }
+          : null,
+      );
+  }
+  // The latest handlers, refreshed after every render; they only use refs and setters.
+  const handlers = useRef<QueueHandlers | null>(null);
+  useEffect(() => {
+    handlers.current = { send: sendSubmission, settle: settleSubmission };
+  });
+  useEffect(() => {
+    alive.current = true;
+    queues.connect({
+      send: (...args) => handlers.current!.send(...args),
+      settle: (...args) => handlers.current!.settle(...args),
+    });
+    return () => {
+      alive.current = false;
+      queues.disconnect();
+    };
+  }, [queues]);
+
+  // Background fan movement owns the account lease; device lanes wait for it.
+  useEffect(() => {
+    queues.setPaused(backgroundMoving || accountWorking.current);
+  }, [backgroundMoving, queues]);
+
+  function deviceStatus(id: string): DeviceStatus {
+    const lane = lanes[id] ?? IDLE_LANE;
+    return {
+      label:
+        lane.phase === "sending"
+          ? "Applying… Waiting for device confirmation"
+          : lane.phase === "waiting"
+            ? "Saving changes…"
+            : lane.phase === "checking"
+              ? "Checking device…"
+              : undefined,
+      optimistic: Object.keys(lane.overlay).length > 0,
+      saving: lane.phase === "sending" || lane.phase === "waiting",
+      directionPending: lane.directionPending,
+      refreshPending: lane.refreshPending,
+      feedback: feedback[id],
+    };
+  }
+
   const shownDevices = state.devices
     .filter((d) => !d.hidden)
-    .map((d) => (pending?.optimistic?.id === d.id ? pending.optimistic : d))
+    .map((d) => {
+      const overlay = (lanes[d.id] ?? IDLE_LANE).overlay;
+      return Object.keys(overlay).length
+        ? ({ ...d, state: { ...d.state, ...overlay } } as Device)
+        : d;
+    })
     .map((d) =>
       unverified.has(d.id)
         ? {
@@ -54,32 +261,22 @@ export function useDashboard(initial: Snapshot) {
       .map((d) => d.id),
   );
 
-  function markUnverified(id: string, failed: boolean) {
-    setUnverified((previous) => {
-      const next = new Set(previous);
-      if (failed) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }
-
   useEffect(() => {
-    alive.current = true;
     let polling = false;
     let cancelled = false;
     async function poll() {
-      if (working.current || document.hidden || polling) return;
+      if (accountWorking.current || document.hidden || polling) return;
       polling = true;
-      const version = operationVersion.current;
+      const version = accountVersion.current;
       try {
-        const next = await request<Snapshot>();
+        const { seq, next } = await loadSnapshot();
         if (
           !cancelled &&
           alive.current &&
-          !working.current &&
-          operationVersion.current === version
+          !accountWorking.current &&
+          accountVersion.current === version
         ) {
-          setState(next);
+          applySnapshot(seq, next);
           setStale(false);
         }
       } catch {
@@ -93,7 +290,6 @@ export function useDashboard(initial: Snapshot) {
     void poll();
     return () => {
       cancelled = true;
-      alive.current = false;
       clearInterval(timer);
       document.removeEventListener("visibilitychange", poll);
     };
@@ -102,46 +298,16 @@ export function useDashboard(initial: Snapshot) {
   useEffect(() => {
     let cancelled = false;
     const ids: string[] = JSON.parse(refreshIds);
-    async function refreshDevices() {
-      if (cancelled || working.current || document.hidden || backgroundMoving) return;
+    function refreshDevices() {
+      if (cancelled || accountWorking.current || document.hidden || backgroundMoving) return;
       // Read every visible device on entry, then at most once per 30 seconds.
-      // Serialize physical reads with commands; never replay a write.
+      // Each device reads in its own lane, after its own commands; never replay a write.
       for (const id of ids) {
-        if (cancelled || working.current || document.hidden) return;
+        if (queues.busy(id)) continue;
         if (Date.now() - (lastAttempt.current.get(id) ?? 0) < 30000) continue;
-        working.current = true;
-        operationVersion.current++;
         lastAttempt.current.set(id, Date.now());
-        setBusy(true);
-        setPending({ id, label: "Checking device…" });
-        let failed = false;
-        try {
-          await request({ type: "refresh", id });
-        } catch {
-          failed = true;
-        }
-        // Failed reads also change the recorded availability. Fetch that result
-        // instead of leaving a previously-online card on screen.
-        try {
-          const next = await request<Snapshot>();
-          if (alive.current) {
-            markUnverified(id, failed);
-            setState(next);
-            setStale(failed);
-          }
-        } catch {
-          if (alive.current) {
-            markUnverified(id, true);
-            setStale(true);
-          }
-        } finally {
-          lastAttempt.current.set(id, Date.now());
-          working.current = false;
-          if (alive.current) {
-            setBusy(false);
-            setPending(null);
-          }
-        }
+        const kind = devicesRef.current.find((d) => d.id === id)?.kind;
+        if (kind) queues.submit(id, kind, { type: "refresh", automatic: true });
       }
     }
     function resume() {
@@ -150,7 +316,7 @@ export function useDashboard(initial: Snapshot) {
       for (const id of ids) {
         if (Date.now() - (lastAttempt.current.get(id) ?? 0) > 5000) lastAttempt.current.delete(id);
       }
-      void refreshDevices();
+      refreshDevices();
     }
     // Defer startup so Strict Mode's discarded effect cannot issue a read.
     const startup = setTimeout(refreshDevices, 0);
@@ -166,88 +332,46 @@ export function useDashboard(initial: Snapshot) {
       window.removeEventListener("focus", resume);
       window.removeEventListener("pageshow", resume);
     };
-  }, [refreshIds, backgroundMoving]);
+  }, [refreshIds, backgroundMoving, queues]);
 
+  /** Account-wide work: waits for in-flight device changes, then holds device lanes. */
   async function task(
     operation: Record<string, unknown>,
     message?: string,
     perform = () => request(operation),
   ) {
-    if (
-      working.current ||
-      (backgroundMoving &&
-        !["fanStop", "fanCheckEnd", "fanObserveEnd"].includes(String(operation.type)))
-    ) {
+    const type = String(operation.type);
+    if (accountWorking.current || (backgroundMoving && !DURING_MOTION.includes(type))) {
       setNotice({
         text: "A request is in progress. Give it a moment, then try again.",
         error: false,
       });
       return;
     }
-    working.current = true;
-    operationVersion.current++;
-    setBusy(true);
+    accountWorking.current = true;
+    accountVersion.current++;
+    setAccountTask(type);
     setNotice(null);
-    const target = state.devices.find((d) => d.id === operation.id);
-    const expected =
-      operation.type === "control" && target
-        ? expectedCommandState(
-            target.kind,
-            String(operation.action),
-            (operation.data ?? {}) as Record<string, unknown>,
-          )
-        : {};
-    const predictsState = Object.keys(expected).length > 0;
-    if (typeof operation.id === "string") {
-      setPending({
-        id: operation.id,
-        label:
-          operation.type === "refresh"
-            ? "Checking device…"
-            : "Applying… Waiting for device confirmation",
-        optimistic:
-          predictsState && target
-            ? ({ ...target, state: { ...target.state, ...expected } } as Device)
-            : undefined,
-      });
-      lastAttempt.current.set(operation.id, Date.now());
-    }
     try {
+      // Pending device changes go first, so account work sees their confirmed result.
+      if (!backgroundMoving) await queues.settled();
+      queues.setPaused(true);
       const result = await perform();
-      if (operation.type === "logout") return result;
-      const next = await request<Snapshot>();
+      if (type === "logout") return result;
+      const { seq, next } = await loadSnapshot();
       if (!alive.current) return;
-      setState(next);
+      applySnapshot(seq, next);
       setStale(false);
-      if (
-        typeof operation.id === "string" &&
-        ["control", "refresh"].includes(String(operation.type))
-      )
-        markUnverified(operation.id, false);
-      const observed = next.devices.find((d) => d.id === operation.id);
-      const warning =
-        result.warning ??
-        (predictsState && (!observed?.online || !matchesCommandState(observed.state, expected))
-          ? "The requested change was not confirmed. Showing the last reported state."
-          : undefined);
-      if (message || warning)
+      if (message || result.warning)
         setNotice({
-          text: String(warning ?? message),
-          error: !!warning,
+          text: String(result.warning ?? message),
+          error: !!result.warning,
         });
       return result;
     } catch (error) {
-      if (
-        alive.current &&
-        typeof operation.id === "string" &&
-        ["control", "refresh"].includes(String(operation.type))
-      )
-        markUnverified(operation.id, true);
-      // A failed response can still have changed the device or its availability.
-      // Recover the recorded state without ever repeating the operation.
       try {
-        const next = await request<Snapshot>();
-        if (alive.current) setState(next);
+        const { seq, next } = await loadSnapshot();
+        if (alive.current) applySnapshot(seq, next);
       } catch {
         if (alive.current) setStale(true);
       }
@@ -257,16 +381,34 @@ export function useDashboard(initial: Snapshot) {
           error: true,
         });
     } finally {
-      working.current = false;
-      if (typeof operation.id === "string") lastAttempt.current.set(operation.id, Date.now());
+      accountWorking.current = false;
       if (alive.current) {
-        setBusy(false);
-        setPending(null);
+        setAccountTask(null);
+        queues.setPaused(backgroundMoving);
       }
     }
   }
+  /** Device adjustments: reflected immediately, combined per device, never blocking others. */
   async function command(id: string, action: string, data: Record<string, unknown> = {}) {
-    await task({ type: "control", id, action, data });
+    const target = state.devices.find((d) => d.id === id);
+    if (!target) return;
+    const { duration, ...values } = data;
+    const settings = actionSettings(target.kind, action, values);
+    if (settings)
+      queues.edit(id, target.kind, settings, typeof duration === "number" ? duration : undefined);
+    else
+      queues.submit(id, target.kind, {
+        type: "command",
+        action,
+        data,
+        expected: expectedCommandState(target.kind, action, data),
+      });
+  }
+  function refreshDevice(id: string, message?: string) {
+    const target = state.devices.find((d) => d.id === id);
+    if (!target) return;
+    setDeviceFeedback(id, null);
+    queues.submit(id, target.kind, { type: "refresh", ...(message ? { message } : {}) });
   }
   async function fanTask(operation: Record<string, unknown>) {
     const result = await task(operation);
@@ -308,22 +450,22 @@ export function useDashboard(initial: Snapshot) {
       });
   }
   function applyScene(scene: Scene) {
-    if (device?.kind === "light")
-      void task(
-        {
-          type: "control",
-          id: device.id,
-          action: "scene",
-          data: {
-            mode: scene.mode,
-            color: scene.color,
-            brightness: scene.brightness,
-            kelvin: scene.kelvin,
-          },
-        },
-        `${scene.name} applied.`,
-      );
+    if (device?.kind !== "light") return;
+    const data = {
+      mode: scene.mode,
+      color: scene.color,
+      brightness: scene.brightness,
+      kelvin: scene.kelvin,
+    };
+    queues.submit(device.id, "light", {
+      type: "command",
+      action: "scene",
+      data,
+      expected: expectedCommandState("light", "scene", data),
+      message: `${scene.name} applied.`,
+    });
   }
+  const busy = accountTask !== null || backgroundMoving;
   return {
     state,
     device,
@@ -332,9 +474,14 @@ export function useDashboard(initial: Snapshot) {
     activeRoom,
     visible,
     shownDevices,
-    busy: busy || backgroundMoving,
+    /** Account-wide work or background fan movement. */
+    busy,
+    accountBusy: accountTask !== null,
+    /** Device controls are held only by fan movement, the direction/calibration safeguard. */
+    deviceBlocked: backgroundMoving || (accountTask?.startsWith("fan") ?? false),
+    deviceStatus,
+    dismissFeedback: (id: string) => setDeviceFeedback(id, null),
     notice,
-    pending,
     dialog,
     qr,
     region,
@@ -348,6 +495,7 @@ export function useDashboard(initial: Snapshot) {
     setRegion,
     task,
     command,
+    refreshDevice,
     fanTask,
     openDevice,
     closeDialog,

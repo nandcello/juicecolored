@@ -98,13 +98,15 @@ test("remaining light and fan controls preserve their exact commands", async ({
   await expect.poll(() => simulation.reads.length).toBe(3);
   await expect(light.getByRole("slider", { name: "Color temperature" })).toBeEnabled();
   await light.getByRole("slider", { name: "Color temperature" }).press("ArrowRight");
-  await expect.poll(() => simulation.commands.at(-1)).toMatchObject({ action: "temperature" });
+  await expect
+    .poll(() => simulation.commands.at(-1))
+    .toMatchObject({ type: "apply", settings: { kelvin: 2800 } });
   await light.getByRole("button", { name: "Color", exact: true }).click();
   await light.getByLabel("Custom color", { exact: true }).fill("#123456");
   await light.getByRole("button", { name: "Apply color", exact: true }).click();
   await expect
     .poll(() => simulation.commands.at(-1))
-    .toMatchObject({ action: "color", data: { color: "#123456" } });
+    .toMatchObject({ type: "apply", settings: { color: "#123456" } });
   await light.getByText("More controls", { exact: true }).click();
   await light.getByRole("button", { name: "Sunset", exact: true }).click();
   await expect

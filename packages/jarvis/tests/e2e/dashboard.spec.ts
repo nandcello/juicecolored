@@ -21,32 +21,32 @@ test("all common controls are exposed and route to the correct device", async ({
   await fan.getByRole("slider", { name: "Fan speed" }).press("ArrowRight");
   await expect
     .poll(() => simulation.commands.at(-1))
-    .toMatchObject({ id: "fixture-fan", action: "speed", data: { speed: 46 } });
+    .toMatchObject({ type: "apply", id: "fixture-fan", settings: { speed: 46 } });
   await expect(fan.getByRole("slider", { name: "Fan speed" })).toHaveValue("46");
   await light.getByRole("slider", { name: "Brightness" }).press("ArrowRight");
   await expect
     .poll(() => simulation.commands.at(-1))
     .toMatchObject({
+      type: "apply",
       id: "fixture-light",
-      action: "brightness",
-      data: { brightness: 76 },
+      settings: { brightness: 76 },
     });
   await bedroom.getByRole("switch", { name: "Light power" }).click();
   await expect(bedroom.getByRole("slider", { name: "Brightness" })).toBeVisible();
   await expect
     .poll(() => simulation.commands.at(-1))
     .toMatchObject({
+      type: "apply",
       id: "fixture-bedroom",
-      action: "power",
-      data: { on: true },
+      settings: { power: true },
     });
   await bedroom.getByRole("slider", { name: "Brightness" }).press("End");
   await expect
     .poll(() => simulation.commands.at(-1))
     .toMatchObject({
+      type: "apply",
       id: "fixture-bedroom",
-      action: "brightness",
-      data: { brightness: 100 },
+      settings: { brightness: 100 },
     });
   const ids = await page
     .locator("input[id]")
@@ -76,9 +76,9 @@ test("light color, extras, scenes and device metadata remain available", async (
   await expect
     .poll(() => simulation.commands.at(-1))
     .toMatchObject({
+      type: "apply",
       id: "fixture-light",
-      action: "color",
-      data: { color: "#b871ff" },
+      settings: { color: "#b871ff" },
     });
   await light.getByRole("button", { name: "White", exact: true }).click();
   await expect(light.getByRole("slider", { name: "Color temperature" })).toBeVisible();
@@ -140,10 +140,16 @@ test("failed and pending commands stay honest and are never retried", async ({
   await expect(fan.getByRole("switch", { name: "Fan power" })).toBeEnabled();
   simulation.delay = 600;
   await fan.getByRole("switch", { name: "Oscillate" }).click();
-  await expect(fan.getByRole("switch", { name: "Oscillate" })).toBeDisabled();
-  await expect(card(page, "Ceiling light").getByRole("switch")).toBeDisabled();
-  await expect(fan.getByRole("switch", { name: "Oscillate" })).not.toBeChecked();
+  // Pending: shown immediately, still editable, and other devices are unaffected.
+  await expect(fan.getByRole("status", { name: "Standing fan state" })).toContainText(
+    "Waiting for device confirmation",
+  );
   await expect(fan.getByRole("switch", { name: "Oscillate" })).toBeEnabled();
+  await expect(card(page, "Ceiling light").getByRole("switch")).toBeEnabled();
+  await expect(fan.getByRole("switch", { name: "Oscillate" })).not.toBeChecked();
+  await expect(fan.getByRole("status", { name: "Standing fan state" })).toContainText(
+    "Checked just now",
+  );
   expect(simulation.commands).toHaveLength(2);
 });
 

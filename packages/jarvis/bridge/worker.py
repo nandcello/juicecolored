@@ -1,6 +1,7 @@
 """Outbound-only Jarvis bridge. Device commands are sent at most once per job."""
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import ipaddress
 import json
 import logging
@@ -61,6 +62,43 @@ def perform(job, device, may_send, protocol_factory=MiIOProtocol, now=time.time)
     # Even an acknowledgement timeout can follow successful physical delivery.
     # Recovery must never resend this request, including direction nudges.
     return protocol.send(job["method"], device_values(job["params"]), retry_count=0)
+
+
+class DeviceLanes:
+    """Deliver each device's jobs in order on its own thread.
+
+    Jobs for one device stay strictly sequential, but a slow or unreachable
+    device cannot hold another device's job until it expires.
+    """
+
+    def __init__(self, deliver):
+        self.deliver = deliver
+        self.lanes = {}
+        self.lock = threading.Lock()
+
+    def submit(self, device_id, *args):
+        with self.lock:
+            lane = self.lanes.get(device_id)
+            if lane is None:
+                lane = self.lanes[device_id] = ThreadPoolExecutor(max_workers=1, thread_name_prefix="jarvis-device")
+        return lane.submit(self.deliver, *args)
+
+
+def deliver(client, identity, job, addresses, protocol_factory=MiIOProtocol):
+    try:
+        may_send = lambda: client.mutation("localBridge:maySend", identity)
+        result = perform(job, addresses.get(job["externalId"]), may_send, protocol_factory)
+        outcome = {"result": result}
+    except Exception as exc:
+        addresses.wake.set()
+        # Never transmit raw library exceptions, which can contain packets.
+        outcome = {"error": "Device did not confirm the local request. Refresh before retrying."}
+        print("Local request failed: " + type(exc).__name__, flush=True)
+    # A failure submitting the result must not cause another device command.
+    try:
+        client.mutation("localBridge:complete", {**identity, **outcome})
+    except Exception as exc:
+        print("Local result unavailable: " + type(exc).__name__, flush=True)
 
 
 class Addresses:
@@ -153,6 +191,15 @@ async def main():
 
     threading.Thread(target=heartbeat, daemon=True).start()
     threading.Thread(target=addresses.run, daemon=True).start()
+    lane_clients = threading.local()
+
+    def lane_client():
+        # Each device lane keeps its own connection instead of sharing one across threads.
+        if not hasattr(lane_clients, "client"):
+            lane_clients.client = ConvexClient(url)
+        return lane_clients.client
+
+    lanes = DeviceLanes(lambda identity, job: deliver(lane_client(), identity, job, addresses))
     delay = 1
     while True:
         try:
@@ -169,16 +216,8 @@ async def main():
                     job = client.mutation("localBridge:claim", identity)
                     if job is None:
                         continue
-                    try:
-                        result = perform(job, addresses.get(job["externalId"]), lambda: client.mutation("localBridge:maySend", identity))
-                        outcome = {"result": result}
-                    except Exception as exc:
-                        addresses.wake.set()
-                        # Never transmit raw library exceptions, which can contain packets.
-                        outcome = {"error": "Device did not confirm the local request. Refresh before retrying."}
-                        print("Local request failed: " + type(exc).__name__, flush=True)
-                    # A failure submitting the result must not cause another device command.
-                    client.mutation("localBridge:complete", {**identity, **outcome})
+                    # Claimed exactly once; the lane sends it at most once.
+                    lanes.submit(job["externalId"], identity, job)
         except Exception as exc:
             ready.clear()
             print("Bridge connection interrupted: " + type(exc).__name__, flush=True)

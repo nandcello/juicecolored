@@ -16,6 +16,8 @@ export type Operation = {
   token?: string;
   round?: number;
   moved?: boolean;
+  settings?: Record<string, unknown>;
+  duration?: number;
 };
 export type Simulation = {
   state: Snapshot;
@@ -27,6 +29,10 @@ export type Simulation = {
   failNext: boolean;
   delay: number;
   commandGate?: Promise<void>;
+  /** Per-device holds: a command for this device waits until released. */
+  deviceGates: Partial<Record<string, Promise<void>>>;
+  /** Fail the next command for these devices. */
+  failDevices: Set<string>;
   unconfirmedNext?: boolean;
   loseNextResponse?: boolean;
   loginPending: boolean;
@@ -43,6 +49,8 @@ export const test = base.extend<{ simulation: Simulation }>({
       physicalPower: {},
       failedReads: new Set(),
       readDelay: 0,
+      deviceGates: {},
+      failDevices: new Set(),
       failNext: false,
       delay: 0,
       loginPending: true,
@@ -93,6 +101,19 @@ export const test = base.extend<{ simulation: Simulation }>({
       }
       simulation.commands.push(op);
       if (simulation.commandGate) await simulation.commandGate;
+      if (op.id && simulation.deviceGates[op.id]) await simulation.deviceGates[op.id];
+      if (op.id && simulation.failDevices.has(op.id)) {
+        simulation.failDevices.delete(op.id);
+        const failed = simulation.state.devices.find((d) => d.id === op.id);
+        if (failed) {
+          failed.online = false;
+          failed.error = "Command not confirmed. Refresh to check the device's current state.";
+        }
+        return route.fulfill({
+          status: 502,
+          json: { error: "Device did not confirm. Refresh before trying again." },
+        });
+      }
       if (simulation.delay) await new Promise((resolve) => setTimeout(resolve, simulation.delay));
       if (simulation.failNext) {
         simulation.failNext = false;
@@ -118,7 +139,7 @@ export const test = base.extend<{ simulation: Simulation }>({
         return route.fulfill({ json: { connected: true } });
       }
       const device = simulation.state.devices.find((d) => d.id === op.id);
-      if (device && op.type === "control" && simulation.unconfirmedNext) {
+      if (device && (op.type === "control" || op.type === "apply") && simulation.unconfirmedNext) {
         simulation.unconfirmedNext = false;
         const warning =
           "The fan accepted the command, but the reported setting has not changed. Showing its last reported state. Refresh to check again.";
@@ -261,6 +282,23 @@ export const test = base.extend<{ simulation: Simulation }>({
         });
       if (op.type === "deleteScene")
         simulation.state.scenes = simulation.state.scenes.filter((s) => s.id !== op.id);
+      if (device && op.type === "apply") {
+        const settings = op.settings ?? {};
+        if (
+          device.kind === "fan" &&
+          device.direction &&
+          ["power", "oscillating", "angle", "childLock"].some((key) => key in settings)
+        )
+          device.direction.position = null;
+        Object.assign(device.state, settings);
+        if (device.kind === "light") {
+          if ("kelvin" in settings) device.state.mode = "white";
+          if ("color" in settings) device.state.mode = "color";
+        }
+        device.online = true;
+        device.error = undefined;
+        device.updatedAt = Date.now();
+      }
       if (device && op.type === "control") {
         const data = op.data ?? {};
         if (op.action === "power") device.state.power = data.on as boolean;
@@ -307,3 +345,15 @@ export const test = base.extend<{ simulation: Simulation }>({
 });
 export { expect } from "@playwright/test";
 export const card = (page: Page, name: string) => page.getByRole("region", { name, exact: true });
+/** Device writes, combined batches and one-off commands, in the order sent. */
+export const writes = (simulation: Simulation, id?: string) =>
+  simulation.commands.filter(
+    (op) => (op.type === "apply" || op.type === "control") && (!id || op.id === id),
+  );
+export function gate() {
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { waiting, release };
+}

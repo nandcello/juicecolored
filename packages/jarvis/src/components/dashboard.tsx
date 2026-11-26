@@ -26,6 +26,9 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
     visible,
     shownDevices,
     busy,
+    accountBusy,
+    deviceBlocked,
+    deviceStatus,
     notice,
     setNotice,
     stale,
@@ -45,7 +48,7 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
     window.scrollTo({ top: 0 });
   }
   return (
-    <div className={c.app} aria-busy={busy}>
+    <div className={c.app} aria-busy={accountBusy}>
       <a href="#main" className={c.skip}>
         Skip to controls
       </a>
@@ -148,13 +151,32 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
           </div>
         )}
         <span role="status" className={c.srOnly}>
-          {busy ? "Updating devices…" : ""}
+          {accountBusy ? "Updating…" : ""}
         </span>
-        {view !== "devices" && controller.pending && (
-          <div className={c.notice} role="status">
-            {controller.pending.label}
-          </div>
-        )}
+        {view === "scenes" &&
+          controller.device &&
+          (() => {
+            const status = deviceStatus(controller.device.id);
+            return status.feedback ? (
+              <div
+                className={status.feedback.error ? c.warning : c.notice}
+                role={status.feedback.error ? "alert" : "status"}
+              >
+                <span>{status.feedback.text}</span>
+                <button
+                  className={c.iconButton}
+                  aria-label="Dismiss notification"
+                  onClick={() => controller.dismissFeedback(controller.device!.id)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            ) : status.label ? (
+              <div className={c.notice} role="status">
+                {status.label}
+              </div>
+            ) : null;
+          })()}
         {view === "devices" ? (
           <>
             {rooms.length > 0 && (
@@ -181,18 +203,14 @@ export function Dashboard({ initial, presets }: { initial: Snapshot; presets: Sc
                           .filter((d) => d.room === r)
                           .map((d) => {
                             const shared = {
-                              busy,
-                              optimistic:
-                                controller.pending?.id === d.id && !!controller.pending.optimistic,
-                              pendingLabel:
-                                controller.pending?.id === d.id
-                                  ? controller.pending.label
-                                  : undefined,
+                              blocked: deviceBlocked,
+                              status: deviceStatus(d.id),
                               onCommand: (action: string, data?: Record<string, unknown>) =>
                                 command(d.id, action, data),
                               onSettings: () => openDevice(d.id, "device"),
                               onRefresh: () =>
-                                void task({ type: "refresh", id: d.id }, `${d.name} refreshed.`),
+                                controller.refreshDevice(d.id, `${d.name} refreshed.`),
+                              onDismiss: () => controller.dismissFeedback(d.id),
                             };
                             return d.kind === "fan" ? (
                               <FanControls
