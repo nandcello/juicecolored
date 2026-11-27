@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { ChevronRight, Fan, Lightbulb, LoaderCircle, RefreshCw, Settings2, X } from "lucide-react";
+import { ChevronRight, Fan, Lightbulb, LoaderCircle, RefreshCw, Settings2 } from "lucide-react";
 import type { Device } from "../lib/domain";
-import type { DeviceStatus } from "./use-dashboard";
 import c from "./dashboard.module.css";
 
 export type Command = (action: string, data?: Record<string, unknown>) => Promise<void>;
@@ -135,37 +134,27 @@ export function Range({
   );
 }
 
-/** Props shared by every device card. Each card reflects only its own device's work. */
-export type DeviceCardProps = {
-  /** Held only by background fan movement, never by another device's command. */
-  blocked: boolean;
-  status: DeviceStatus;
-  onCommand: Command;
-  onRefresh: () => void;
-  onSettings: () => void;
-  onDismiss: () => void;
-};
-
 export function DeviceCard({
   device,
-  blocked,
-  status,
+  busy,
+  pendingLabel,
+  optimistic = false,
   onCommand,
   onRefresh,
   onSettings,
-  onDismiss,
   children,
   extras,
-}: DeviceCardProps & {
+}: {
   device: Device;
+  busy: boolean;
+  pendingLabel?: string;
+  optimistic?: boolean;
+  onCommand: Command;
+  onRefresh: () => void;
+  onSettings: () => void;
   children: ReactNode;
   extras: ReactNode;
 }) {
-  const pendingLabel = status.label;
-  const optimistic = status.optimistic;
-  const feedback = status.feedback;
-  const failure = feedback?.error ? feedback : undefined;
-  const refreshDisabled = blocked || status.refreshPending;
   const titleId = useId();
   const statusId = useId();
   const ready = device.online && device.updatedAt > 0;
@@ -188,7 +177,6 @@ export function DeviceCard({
     <section
       aria-labelledby={titleId}
       aria-describedby={statusId}
-      aria-busy={!!pendingLabel}
       className={`${c.deviceCard} ${compact ? c.compactCard : ""}`}
     >
       <header className={c.deviceHeader}>
@@ -202,7 +190,7 @@ export function DeviceCard({
             label={`${device.kind === "fan" ? "Fan" : "Light"} power`}
             checked={device.state.power}
             lastKnown={!optimistic && (!recent || !!pendingLabel)}
-            disabled={blocked || !ready || !device.capabilities.includes("power")}
+            disabled={busy || !ready || !device.capabilities.includes("power")}
             onChange={(on) => void onCommand("power", { on })}
           />
         ) : (
@@ -243,41 +231,27 @@ export function DeviceCard({
         </span>
         <button
           className={c.textButton}
-          disabled={refreshDisabled}
+          disabled={busy}
           onClick={onRefresh}
           aria-label={`Refresh ${device.name}`}
         >
           <RefreshCw size={14} aria-hidden="true" /> Check now
         </button>
       </div>
-      {feedback && !feedback.error && (
-        <div className={c.notice} role="status">
-          <span>{feedback.text}</span>
-          <button
-            className={c.iconButton}
-            aria-label={`Dismiss ${device.name} message`}
-            onClick={onDismiss}
-          >
-            <X size={18} />
-          </button>
-        </div>
-      )}
-      {/* A failed or unconfirmed change is explained once, in this device's own warning. */}
-      {ready && (device.error || failure) && (
-        <div className={c.deviceWarning} role={failure ? "alert" : "status"}>
+      {ready && device.error && (
+        <div className={c.deviceWarning} role="status">
           <strong>Setting not confirmed</strong>
-          <p>{failure?.text ?? device.error}</p>
+          <p>{device.error}</p>
         </div>
       )}
       {!ready && (
-        <div className={c.deviceWarning} role={failure ? "alert" : undefined}>
+        <div className={c.deviceWarning}>
           <strong>{device.updatedAt ? "Current state unavailable" : "State not read yet"}</strong>
           <p>
-            {failure?.text ??
-              device.error ??
+            {device.error ??
               "Refresh to check this device. Controls are unavailable until it responds."}
           </p>
-          <button className={c.textButton} disabled={refreshDisabled} onClick={onRefresh}>
+          <button className={c.textButton} disabled={busy} onClick={onRefresh}>
             <RefreshCw size={16} /> Refresh device
           </button>
         </div>
@@ -295,10 +269,10 @@ export function DeviceCard({
         <div className={c.extraControls}>
           {extras}
           <div className={c.extraActions}>
-            <button className={c.button} disabled={refreshDisabled} onClick={onRefresh}>
+            <button className={c.button} disabled={busy} onClick={onRefresh}>
               <RefreshCw size={16} /> Refresh
             </button>
-            <button className={c.button} disabled={blocked} onClick={onSettings}>
+            <button className={c.button} disabled={busy} onClick={onSettings}>
               <Settings2 size={16} /> Device settings
             </button>
           </div>

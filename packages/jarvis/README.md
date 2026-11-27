@@ -34,15 +34,7 @@ The owner passphrase is the `JARVIS_OWNER_PASSPHRASE` entry in `.env.credentials
 - Confirmed command history and explicit error reporting.
 - Selected device refreshes every minute while the dashboard is visible; **Refresh** reads immediately. The browser checks the stored snapshot every 15 seconds, every 1.5 seconds during background movement, and when returning to the page. Physical background refreshes pause during movement.
 
-Each device has its own command lane. An adjustment is reflected immediately and the device stays editable while it saves; other devices, and the rest of the app, are never put into a loading state. Absolute settings (power, speed, airflow, oscillation, angle, timers, indicator, sound, child lock, brightness, white temperature, color) made within a 600 ms idle window are combined into one submitted change carrying only the latest value of each setting. Edits made while a change is in flight are kept, shown, and combined into the next change. The card shows “Saving changes…” while a change is queued and “Applying… Waiting for device confirmation” while it is sent and confirmed, then settles to the reported state. Failures roll back only the failed settings, mark that device unverified and explain the problem inside that device's card; newer intent is preserved and sent once. Snapshots and reads requested before a device's latest confirmation are ignored for that device. Lost responses trigger a snapshot read, never a repeated command.
-
-What one combined change means at the device:
-
-- **Standing fan:** one MIoT `set_properties` request (local bridge) or one `/miotspec/prop/set` call (cloud) carries every changed property, power-on first and power-off last. The fan acknowledges each property separately; the request is a single delivery, not a transaction. Any rejected property fails the change (“accepted N of M settings”), and nothing is resent.
-- **Yeelight:** miIO has no multi-property set, so one change becomes one ordered sequence of at most one method per changed setting (`set_power` on, `set_bright`, `set_ct_abx` or `set_rgb`, `cron_add`/`cron_del`, `set_power` off), followed by one readback. It is one gateway request, one lease and one activity entry, but not atomic at the bulb: the sequence stops at the first unacknowledged method and reports how many were applied.
-- Direction nudges, effects, scenes and **Save power-on default** are one-off commands. They are never merged or dropped; they run in order after earlier adjustments. Turn left/right is unavailable while a nudge is pending, and aiming waits until the fan confirms pending changes.
-
-The backend serializes device commands and reads with a per-device lease. Account-wide work (sign-in, discovery, settings) and background fan movement hold the account lease, which excludes every device lease in both directions, so calibration and aiming keep their existing safeguards. The Bathala bridge delivers each device's jobs in order on its own thread, so a slow device cannot hold another device's job until it expires.
+Commands are serialized per Xiaomi account. Predictable controls update immediately and show “Applying… Waiting for device confirmation” while awaiting the command and server snapshot. They settle to the reported state on completion, including rollback and an explanation on failure. Lost responses trigger a snapshot read, never a repeated command.
 
 Fan status reads explicitly request fresh device values. After a fan command, Jarvis checks the changed setting with at most three reads, waiting 500 ms and then 1500 ms if needed. If it does not converge, the last reported state and a confirmation warning are saved; the warning survives reloads. Direction nudges cannot confirm a physical position. Previously reported state is retained and labeled offline on read failure. Optimistic display state itself is temporary and is discarded on reload; backend confirmation continues independently.
 
@@ -87,7 +79,7 @@ the shared website's Git deployment from `master`.
 - `convex/`: Xiaomi protocol adapters, commands, stored state and authorization.
 - `tests/`: unit tests, backend tests, and Playwright coverage.
 
-The cached integration catalog uses `use cache`; cookies and observed device state stay outside that cache. Same-origin JSON requests and the signed, seven-day HttpOnly, Secure (HTTPS), SameSite=Strict owner cookie remain scoped to `/jarvis`. Browser snapshots exclude credentials and upstream device identifiers. Commands are serialized per device, account-wide work per Xiaomi account, and nothing is automatically retried.
+The cached integration catalog uses `use cache`; cookies and observed device state stay outside that cache. Same-origin JSON requests and the signed, seven-day HttpOnly, Secure (HTTPS), SameSite=Strict owner cookie remain scoped to `/jarvis`. Browser snapshots exclude credentials and upstream device identifiers. Commands are serialized per Xiaomi account and never automatically retried.
 
 ## Deploy
 
@@ -110,10 +102,6 @@ vp run test:e2e:auth
 ```
 
 The UI suite copies the unified Next app into a temporary workspace and uses fixture devices; it never sends physical commands. It exercises home controls, scenes, activity, settings, connection dialogs, command errors, direction calibration and responsive layouts. The auth suite targets the running shared application and verifies owner login, session scope, reload, origin rejection and logout using the private local passphrase. It does not send device commands.
-
-For manual QA, `node tests/preview-ui.mjs 4320 --qa` serves the real `/jarvis` dashboard at `http://127.0.0.1:4320/jarvis` against an in-memory simulator of the three fixture devices. `http://127.0.0.1:4320/jarvis/qa` sets a per-device response delay, holds or fails the next request, and logs every outgoing request with the exact device-boundary miIO/MIoT requests the gateway would deliver, planned with the production adapter code. It never contacts Convex, Xiaomi, the bridge or a household device.
-
-Bridge tests run with `python3 -m unittest test_worker` from `bridge/` in the bridge's virtual environment.
 
 The protocol and backend tests verify authentication, credential isolation, encryption, acknowledgments, failure without retry, metadata preservation, disconnect, rate limits and leases. These simulated RPC tests do not establish physical-device connectivity.
 

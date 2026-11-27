@@ -1,12 +1,7 @@
 import { PROPS, makeCommand } from "./vendor/controls.mjs";
 import { XiaomiClient } from "./vendor/xiaomi.mjs";
 import type { LightState } from "../../domain";
-import {
-  expectedCommandState,
-  expectedSettingsState,
-  matchesCommandState,
-  type LightSettings,
-} from "../../command-state";
+import { expectedCommandState, matchesCommandState } from "../../command-state";
 
 export type Session = {
   userId?: string;
@@ -98,55 +93,6 @@ export async function readLightAfterCommand(
   if (["power", "brightness", "temperature", "color"].includes(action))
     await new Promise((resolve) => setTimeout(resolve, data.duration ?? 500));
   const expected = expectedCommandState("light", action, data);
-  let state = await readLight(client, id);
-  for (const delay of [750, 1500]) {
-    if (matchesCommandState(state, expected)) break;
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    state = await readLight(client, id);
-  }
-  return { state, confirmed: matchesCommandState(state, expected) };
-}
-
-/**
- * Yeelight's miIO protocol has no multi-property set: each changed setting is
- * one method. A combined change sends at most one method per setting, with its
- * latest value, in a safe order (power on first, power off last).
- */
-export function lightSettingsCommands(
-  settings: LightSettings,
-  duration?: number,
-): [string, unknown[]][] {
-  if (settings.kelvin !== undefined && settings.color !== undefined)
-    throw new Error("Choose white temperature or color, not both.");
-  const timing = duration === undefined ? {} : { duration };
-  const commands: [string, unknown[]][] = [];
-  if (settings.power === true) commands.push(command("power", { on: true, ...timing }));
-  if (settings.brightness !== undefined)
-    commands.push(command("brightness", { brightness: settings.brightness, ...timing }));
-  if (settings.kelvin !== undefined)
-    commands.push(command("temperature", { kelvin: settings.kelvin, ...timing }));
-  if (settings.color !== undefined)
-    commands.push(command("color", { color: settings.color, ...timing }));
-  if (settings.offInMinutes !== undefined)
-    commands.push(
-      settings.offInMinutes > 0
-        ? command("timer", { minutes: settings.offInMinutes })
-        : command("cancelTimer", {}),
-    );
-  if (settings.power === false) commands.push(command("power", { on: false, ...timing }));
-  if (!commands.length) throw new Error("Choose a light setting to change.");
-  return commands;
-}
-
-export async function readLightAfterSettings(
-  client: CloudClient,
-  id: string,
-  settings: LightSettings,
-  duration?: number,
-) {
-  const expected = expectedSettingsState("light", settings);
-  if (["power", "brightness", "kelvin", "color"].some((key) => key in settings))
-    await new Promise((resolve) => setTimeout(resolve, duration ?? 500));
   let state = await readLight(client, id);
   for (const delay of [750, 1500]) {
     if (matchesCommandState(state, expected)) break;

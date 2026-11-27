@@ -1,12 +1,5 @@
 "use node";
-import {
-  readFan,
-  readFanAfterCommand,
-  readFanAfterSettings,
-  controlFan,
-  controlFanSettings,
-  FAN_MODEL,
-} from "./adapters/fan";
+import { readFan, readFanAfterCommand, controlFan, FAN_MODEL } from "./adapters/fan";
 import { randomUUID } from "node:crypto";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -15,19 +8,11 @@ import type { Id } from "./_generated/dataModel";
 import { v, ConvexError } from "convex/values";
 import { requireGateway } from "./security";
 import { seal, unseal, verifyPassword } from "./crypto";
-import {
-  createClient,
-  command,
-  lightSettingsCommands,
-  readLight,
-  readLightAfterCommand,
-  readLightAfterSettings,
-} from "./adapters/yeelight";
+import { createClient, command, readLight, readLightAfterCommand } from "./adapters/yeelight";
 import type { CloudClient, ControlData } from "./adapters/yeelight";
 import { accountClient } from "./accountClient";
 import { XiaomiAuthError } from "./adapters/vendor/xiaomi.mjs";
 import { hasLocalControl, usesLocalControl } from "./localConfig";
-import { settingsLabel, type DeviceSettings } from "../command-state";
 const controlData = v.object({
   on: v.optional(v.boolean()),
   speed: v.optional(v.number()),
@@ -54,28 +39,7 @@ const controlData = v.object({
     ),
   ),
 });
-// Absolute settings combined from a burst of adjustments; latest value per setting.
-const settings = v.object({
-  power: v.optional(v.boolean()),
-  speed: v.optional(v.number()),
-  mode: v.optional(v.union(v.literal("straight"), v.literal("natural"))),
-  oscillating: v.optional(v.boolean()),
-  angle: v.optional(v.number()),
-  offInMinutes: v.optional(v.number()),
-  indicator: v.optional(v.boolean()),
-  sound: v.optional(v.boolean()),
-  childLock: v.optional(v.boolean()),
-  brightness: v.optional(v.number()),
-  kelvin: v.optional(v.number()),
-  color: v.optional(v.string()),
-});
 const operation = v.union(
-  v.object({
-    type: v.literal("apply"),
-    id: v.id("devices"),
-    settings,
-    duration: v.optional(v.number()),
-  }),
   v.object({ type: v.literal("fanSetup"), id: v.id("devices") }),
   v.object({
     type: v.literal("fanCheckEnd"),
@@ -160,30 +124,26 @@ async function refresh(
   ctx: ActionCtx,
   client: CloudClient,
   id: Id<"devices">,
-  command?: { action: string; data: ControlData } | { settings: DeviceSettings; duration?: number },
+  command?: { action: string; data: ControlData },
 ) {
   const d = await ctx.runQuery(internal.store.device, { id });
   if (!d) throw new Error("Device no longer exists. Refresh your device list.");
   try {
     const { state, confirmed } =
-      command && "settings" in command
-        ? d.kind === "fan"
-          ? await readFanAfterSettings(client, d.externalId, command.settings)
-          : await readLightAfterSettings(client, d.externalId, command.settings, command.duration)
-        : d.kind === "fan" && command
-          ? await readFanAfterCommand(client, d.externalId, command.action, command.data)
-          : d.kind === "light" && command
-            ? await readLightAfterCommand(client, d.externalId, command.action, command.data)
-            : {
-                state:
-                  d.kind === "fan"
-                    ? await readFan(client, d.externalId)
-                    : await readLight(client, d.externalId),
-                confirmed: true,
-              };
+      d.kind === "fan" && command
+        ? await readFanAfterCommand(client, d.externalId, command.action, command.data)
+        : d.kind === "light" && command
+          ? await readLightAfterCommand(client, d.externalId, command.action, command.data)
+          : {
+              state:
+                d.kind === "fan"
+                  ? await readFan(client, d.externalId)
+                  : await readLight(client, d.externalId),
+              confirmed: true,
+            };
     const warning = confirmed
       ? undefined
-      : command && "action" in command && command.action === "power"
+      : command?.action === "power"
         ? `The device accepted the command but still reports ${state.power ? "on" : "off"}. Showing its reported state.`
         : d.kind === "fan"
           ? "The fan accepted the command, but the reported setting has not changed. Showing its last reported state. Refresh to check again."
@@ -230,43 +190,6 @@ async function discover(ctx: ActionCtx) {
   }
   return { found: ids.length };
 }
-async function confirmCommand(
-  ctx: ActionCtx,
-  client: CloudClient,
-  device: { _id: Id<"devices">; name: string },
-  label: string,
-  readback: Parameters<typeof refresh>[3],
-  send: () => Promise<void>,
-) {
-  try {
-    await send();
-    // Never retry a command automatically: a network timeout can follow successful delivery.
-    let warning: string | undefined;
-    try {
-      ({ warning } = await refresh(ctx, client, device._id, readback));
-    } catch {
-      warning = "The device accepted the command, but its state could not be refreshed.";
-    }
-    await ctx.runMutation(internal.store.event, {
-      deviceName: device.name,
-      label: warning ? "Command accepted — state not confirmed" : label,
-      status: warning ? "error" : "success",
-    });
-    return { ok: true, ...(warning ? { warning } : {}) };
-  } catch (error) {
-    await ctx.runMutation(internal.store.updateState, {
-      id: device._id,
-      online: false,
-      error: "Command not confirmed. Refresh to check the device's current state.",
-    });
-    await ctx.runMutation(internal.store.event, {
-      deviceName: device.name,
-      label: "Command not confirmed — refresh before retrying",
-      status: "error",
-    });
-    throw error;
-  }
-}
 export const execute = action({
   args: { secret: v.string(), operation },
   handler: async (ctx, { secret, operation: op }): Promise<unknown> => {
@@ -290,22 +213,10 @@ export const execute = action({
       else await ctx.runMutation(internal.fanCalibration.observeEnd, { ...args, moved: op.moved });
       return { ok: true };
     }
-    const token = randomUUID();
-    // Device reads and writes hold only that device's lease, so one slow device
-    // never blocks another. Account work and fan movement hold the account lease.
-    const deviceScoped = op.type === "refresh" || op.type === "control" || op.type === "apply";
-    const lease = deviceScoped
-      ? await ctx.runMutation(internal.store.acquireDevice, { id: op.id, token })
-      : (await ctx.runMutation(internal.store.acquire, { key: "xiaomi-owner", token }))
-        ? { key: "xiaomi-owner" }
-        : { busy: "account" as const };
-    if (!("key" in lease) || !lease.key)
-      throw new ConvexError(
-        "busy" in lease && lease.busy === "device"
-          ? "This device is finishing another request. Try again in a moment."
-          : "Another request is in progress. Try again in a moment.",
-      );
-    const key = lease.key;
+    const token = randomUUID(),
+      key = "xiaomi-owner";
+    if (!(await ctx.runMutation(internal.store.acquire, { key, token })))
+      throw new ConvexError("Another request is in progress. Try again in a moment.");
     let backgroundOwnsLease = false;
     try {
       if (op.type === "fanSetup") {
@@ -451,56 +362,6 @@ export const execute = action({
       }
       if (device.kind === "fan" && device.model !== FAN_MODEL)
         throw new Error("This fan model is not supported yet.");
-      if (op.type === "apply") {
-        const changes = op.settings as DeviceSettings;
-        const supported =
-          device.kind === "fan"
-            ? [
-                "power",
-                "speed",
-                "mode",
-                "oscillating",
-                "angle",
-                "offInMinutes",
-                "indicator",
-                "sound",
-                "childLock",
-              ]
-            : ["power", "brightness", "kelvin", "color", "offInMinutes"];
-        if (Object.keys(changes).some((key) => !supported.includes(key)))
-          throw new Error("Invalid setting for this device.");
-        return await confirmCommand(
-          ctx,
-          client,
-          device,
-          settingsLabel(device.kind, changes),
-          {
-            settings: changes,
-            ...(op.duration === undefined ? {} : { duration: op.duration }),
-          },
-          async () => {
-            if (device.kind === "fan") {
-              if (["power", "oscillating", "angle", "childLock"].some((key) => key in changes))
-                await ctx.runMutation(internal.store.invalidateFanDirection, { id: op.id });
-              // One local `set_properties` / cloud `prop/set` request for all changed properties.
-              await controlFanSettings(client, device.externalId, changes);
-            } else {
-              const commands = lightSettingsCommands(changes, op.duration);
-              let applied = 0;
-              for (const [method, params] of commands) {
-                const result = await client.rpc(device.externalId, method, params);
-                if (!Array.isArray(result) || result[0] !== "ok")
-                  throw new Error(
-                    applied
-                      ? `The bulb applied ${applied} of ${commands.length} changes. Refresh before retrying.`
-                      : "The bulb did not confirm the command. Refresh before retrying.",
-                  );
-                applied++;
-              }
-            }
-          },
-        );
-      }
       if (op.action === "timerStatus" || op.action === "rename")
         throw new Error("Use the device settings to rename this device.");
       const label =
@@ -527,7 +388,7 @@ export const execute = action({
               stopFlow: "Effect stopped",
               default: "Power-on default saved",
             }[op.action] ?? "Device updated");
-      return await confirmCommand(ctx, client, device, label, op, async () => {
+      try {
         if (device.kind === "fan") {
           if (["direction", "power", "oscillation", "angle", "childLock"].includes(op.action))
             await ctx.runMutation(internal.store.invalidateFanDirection, { id: op.id });
@@ -538,7 +399,32 @@ export const execute = action({
           if (!Array.isArray(result) || result[0] !== "ok")
             throw new Error("The bulb did not confirm the command. Refresh before retrying.");
         }
-      });
+        // Never retry a command automatically: a network timeout can follow successful delivery.
+        let warning: string | undefined;
+        try {
+          ({ warning } = await refresh(ctx, client, op.id, op));
+        } catch {
+          warning = "The device accepted the command, but its state could not be refreshed.";
+        }
+        await ctx.runMutation(internal.store.event, {
+          deviceName: device.name,
+          label: warning ? "Command accepted — state not confirmed" : label,
+          status: warning ? "error" : "success",
+        });
+        return { ok: true, ...(warning ? { warning } : {}) };
+      } catch (error) {
+        await ctx.runMutation(internal.store.updateState, {
+          id: op.id,
+          online: false,
+          error: "Command not confirmed. Refresh to check the device's current state.",
+        });
+        await ctx.runMutation(internal.store.event, {
+          deviceName: device.name,
+          label: "Command not confirmed — refresh before retrying",
+          status: "error",
+        });
+        throw error;
+      }
     } catch (error) {
       // Return only adapter-authored messages. No upstream payloads, tokens or stack traces.
       if (error instanceof ConvexError) throw error;

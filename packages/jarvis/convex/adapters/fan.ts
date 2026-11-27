@@ -1,6 +1,5 @@
 import type { FanState } from "../../domain";
 import type { CloudClient, ControlData } from "./yeelight";
-import type { FanSettings } from "../../command-state";
 
 // Mi Smart Standing Fan 2 only. Property IDs come from the dmaker-p18:1 MIoT spec.
 export const FAN_MODEL = "dmaker.fan.p18";
@@ -159,71 +158,4 @@ export async function controlFan(
     )
   )
     throw new Error("The fan did not confirm the command. Refresh before retrying.");
-}
-
-// Each setting maps to exactly one absolute MIoT property. Power-on is applied
-// first and power-off last, so the device never receives settings while off.
-const SETTING_ACTIONS: Record<keyof FanSettings, (value: never) => [string, ControlData]> = {
-  power: (on: boolean) => ["power", { on }],
-  speed: (speed: number) => ["speed", { speed }],
-  mode: (mode: string) => ["fanMode", { mode }],
-  oscillating: (on: boolean) => ["oscillation", { on }],
-  angle: (angle: number) => ["angle", { angle }],
-  offInMinutes: (minutes: number) => ["timer", { minutes }],
-  indicator: (on: boolean) => ["indicator", { on }],
-  sound: (on: boolean) => ["sound", { on }],
-  childLock: (on: boolean) => ["childLock", { on }],
-};
-export function fanSettingsCommand(id: string, settings: FanSettings): Property[] {
-  const keys = (Object.keys(SETTING_ACTIONS) as (keyof FanSettings)[]).filter(
-    (key) => settings[key] !== undefined,
-  );
-  if (!keys.length) throw new Error("Choose a fan setting to change.");
-  const ordered = [
-    ...keys.filter((key) => key === "power" && settings.power === true),
-    ...keys.filter((key) => key !== "power"),
-    ...keys.filter((key) => key === "power" && settings.power === false),
-  ];
-  return ordered.map((key) => {
-    const [action, data] = SETTING_ACTIONS[key](settings[key] as never);
-    return fanCommand(id, action, data);
-  });
-}
-
-/**
- * One MIoT `set_properties` request carries every changed property. Xiaomi
- * applies and acknowledges each property separately; the request is a single
- * delivery, not a transaction, so a partial rejection is reported as failure.
- */
-export async function controlFanSettings(client: CloudClient, id: string, settings: FanSettings) {
-  const params = fanSettingsCommand(id, settings);
-  const result = await client.api("/miotspec/prop/set", { params });
-  const accepted = Array.isArray(result)
-    ? params.filter((property) =>
-        result.some(
-          (r: Property) =>
-            r.did === id && r.siid === property.siid && r.piid === property.piid && r.code === 0,
-        ),
-      ).length
-    : 0;
-  if (!Array.isArray(result) || result.length !== params.length || accepted !== params.length)
-    throw new Error(
-      accepted > 0
-        ? `The fan accepted ${accepted} of ${params.length} settings. Refresh before retrying.`
-        : "The fan did not confirm the command. Refresh before retrying.",
-    );
-}
-
-export async function readFanAfterSettings(client: CloudClient, id: string, settings: FanSettings) {
-  const matches = (state: FanState) =>
-    (Object.keys(settings) as (keyof FanSettings)[]).every(
-      (key) => settings[key] === undefined || state[key] === settings[key],
-    );
-  let state = await readFan(client, id);
-  for (const delay of [500, 1500]) {
-    if (matches(state)) break;
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    state = await readFan(client, id);
-  }
-  return { state, confirmed: matches(state) };
 }

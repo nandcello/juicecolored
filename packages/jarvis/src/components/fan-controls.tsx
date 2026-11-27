@@ -4,32 +4,44 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, MoveHorizontal } from "lucide-react";
 import type { FanDevice } from "../lib/domain";
 import { FanDirection, type FanDirectionActions } from "./fan-direction";
-import { DeviceCard, Range, Switch, type DeviceCardProps } from "./device-controls";
+import { DeviceCard, Range, Switch, type Command } from "./device-controls";
 import c from "./dashboard.module.css";
 
 export function FanControls({
   device,
+  busy,
+  pendingLabel,
+  optimistic = false,
+  onCommand,
+  onSettings,
+  onRefresh,
   directionActions,
-  ...card
-}: DeviceCardProps & {
+}: {
   device: FanDevice;
+  busy: boolean;
+  pendingLabel?: string;
+  optimistic?: boolean;
+  onCommand: Command;
+  onSettings: () => void;
+  onRefresh: () => void;
   directionActions: FanDirectionActions;
 }) {
-  const { blocked, status, onCommand } = card;
   const state = device.state;
   const [minutes, setMinutes] = useState(String(state.offInMinutes || 60));
   const [directionVersion, setDirectionVersion] = useState(0);
-  // Saving never disables this device's controls; edits made meanwhile are combined.
-  const disabled = blocked || !device.online || device.updatedAt <= 0;
+  const disabled = busy || !device.online || device.updatedAt <= 0;
   const stopped = disabled || !state.power;
-  // Each nudge is a physical movement: one at a time, never queued behind another.
-  const nudging = stopped || status.directionPending;
   const supports = (capability: FanDevice["capabilities"][number]) =>
     device.capabilities.includes(capability);
   return (
     <DeviceCard
       device={device}
-      {...card}
+      busy={busy}
+      pendingLabel={pendingLabel}
+      optimistic={optimistic}
+      onCommand={onCommand}
+      onRefresh={onRefresh}
+      onSettings={onSettings}
       extras={
         <>
           {supports("oscillation") && (
@@ -51,7 +63,7 @@ export function FanControls({
               <div className={c.extraActions}>
                 <button
                   className={c.button}
-                  disabled={nudging}
+                  disabled={stopped}
                   onClick={() => {
                     setDirectionVersion((v) => v + 1);
                     void onCommand("direction", { direction: "left" });
@@ -61,7 +73,7 @@ export function FanControls({
                 </button>
                 <button
                   className={c.button}
-                  disabled={nudging}
+                  disabled={stopped}
                   onClick={() => {
                     setDirectionVersion((v) => v + 1);
                     void onCommand("direction", { direction: "right" });
@@ -184,15 +196,13 @@ export function FanControls({
           deviceId={device.id}
           direction={device.direction}
           actions={directionActions}
-          disabled={stopped || state.oscillating || state.childLock || status.saving}
+          disabled={stopped || state.oscillating || state.childLock}
           unavailable={
             state.oscillating
               ? "Turn off oscillation to aim the fan."
               : state.childLock
                 ? "Turn off child lock to aim the fan."
-                : status.saving
-                  ? "Aiming is available once the fan confirms your changes."
-                  : undefined
+                : undefined
           }
         />
       )}

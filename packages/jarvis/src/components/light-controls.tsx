@@ -2,26 +2,35 @@
 
 import { useId, useState } from "react";
 import type { LightDevice } from "../lib/domain";
-import { DeviceCard, Range, type Command, type DeviceCardProps } from "./device-controls";
+import { DeviceCard, Range, type Command } from "./device-controls";
 import c from "./dashboard.module.css";
 
 export function LightControls({
   device,
+  busy,
+  pendingLabel,
+  optimistic = false,
+  onCommand,
   onSave,
-  ...card
-}: DeviceCardProps & {
+  onSettings,
+  onRefresh,
+}: {
   device: LightDevice;
+  busy: boolean;
+  pendingLabel?: string;
+  optimistic?: boolean;
+  onCommand: Command;
   onSave: () => void;
+  onSettings: () => void;
+  onRefresh: () => void;
 }) {
-  const { blocked, onCommand } = card;
   const state = device.state;
   const colorId = useId();
   const [customColor, setCustomColor] = useState<string | null>(null);
   const [transition, setTransition] = useState("500");
   const [minutes, setMinutes] = useState("30");
   const ready = device.online && device.updatedAt > 0;
-  // Saving never disables this light; edits made meanwhile are combined.
-  const unavailable = !ready || blocked;
+  const unavailable = !ready || busy;
   const disabled = unavailable || !state.power;
   const color = customColor ?? state.color;
   const supports = (capability: LightDevice["capabilities"][number]) =>
@@ -31,8 +40,12 @@ export function LightControls({
   return (
     <DeviceCard
       device={device}
-      {...card}
+      busy={busy}
+      pendingLabel={pendingLabel}
+      optimistic={optimistic}
       onCommand={send}
+      onRefresh={onRefresh}
+      onSettings={onSettings}
       extras={
         <>
           <label className={c.field}>

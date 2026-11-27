@@ -1,4 +1,4 @@
-import { test, expect, card, writes } from "./fixtures";
+import { test, expect, card } from "./fixtures";
 
 test("fan airflow, oscillation, advanced controls, hiding and restoring", async ({
   page,
@@ -14,15 +14,17 @@ test("fan airflow, oscillation, advanced controls, hiding and restoring", async 
   await expect
     .poll(() => simulation.commands.at(-1))
     .toMatchObject({
-      type: "apply",
       id: "fixture-fan",
-      settings: { mode: "natural" },
+      action: "fanMode",
+      data: { mode: "natural" },
     });
   await fan.getByRole("switch", { name: "Oscillate" }).click();
   await expect(fan.getByRole("switch", { name: "Oscillate" })).not.toBeChecked();
   await fan.getByText("More controls", { exact: true }).click();
   await fan.getByLabel("Oscillation angle").selectOption("120");
-  await expect.poll(() => writes(simulation).some((op) => op.settings?.angle === 120)).toBe(true);
+  await expect
+    .poll(() => simulation.commands.at(-1))
+    .toMatchObject({ action: "angle", data: { angle: 120 } });
   await fan.getByRole("button", { name: "Turn left" }).click();
   await expect
     .poll(() => simulation.commands.at(-1))
@@ -39,18 +41,7 @@ test("fan airflow, oscillation, advanced controls, hiding and restoring", async 
   await expect(page.getByRole("button", { name: "Restore Standing fan" })).toHaveCount(0);
   await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(fan).toBeVisible();
-  // Adjustments are combined; every setting is sent once and the nudge stays a one-off command.
-  const sent = writes(simulation);
-  expect(sent.filter((op) => op.type === "control")).toEqual([
-    { type: "control", id: "fixture-fan", action: "direction", data: { direction: "left" } },
-  ]);
-  expect(sent.flatMap((op) => Object.keys(op.settings ?? {})).sort()).toEqual([
-    "angle",
-    "childLock",
-    "mode",
-    "offInMinutes",
-    "oscillating",
-  ]);
+  expect(simulation.commands.filter((op) => op.type === "control")).toHaveLength(6);
 });
 
 test("offline and unverified devices retain honest state and disabled controls", async ({

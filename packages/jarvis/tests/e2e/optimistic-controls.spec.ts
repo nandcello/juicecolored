@@ -24,7 +24,7 @@ for (const fail of [false, true]) {
     const toggle = card(page, "Standing fan").getByRole("switch", { name: "Oscillate" });
     await toggle.click();
     await expect(toggle).not.toBeChecked();
-    await expect(toggle).toBeEnabled();
+    await expect(toggle).toBeDisabled();
     await expect(
       card(page, "Standing fan").getByRole("status", { name: "Standing fan state" }),
     ).toContainText("Waiting for device confirmation");
@@ -50,7 +50,7 @@ for (const fail of [false, true]) {
   });
 }
 
-test("an off light expands immediately and stays adjustable while power is confirmed", async ({
+test("an off light expands immediately but remains disabled until confirmed", async ({
   page,
   simulation,
 }) => {
@@ -62,20 +62,11 @@ test("an off light expands immediately and stays adjustable while power is confi
   await toggle.click();
   await expect(toggle).toBeChecked();
   await expect(light.getByRole("slider", { name: "Brightness" })).toBeVisible();
-  await expect(light.getByRole("slider", { name: "Brightness" })).toBeEnabled();
-  await expect.poll(() => simulation.commands.length).toBe(1);
-  await light.getByRole("slider", { name: "Brightness" }).press("ArrowRight");
-  await expect(light.getByRole("slider", { name: "Brightness" })).toHaveValue("36");
+  await expect(light.getByRole("slider", { name: "Brightness" })).toBeDisabled();
   expect(simulation.state.devices.find((d) => d.id === "fixture-bedroom")?.state.power).toBe(false);
   release();
   await expect(toggle).toBeEnabled();
   await expect(toggle).toBeChecked();
-  await expect.poll(() => simulation.commands.length).toBe(2);
-  expect(simulation.commands.map((op) => op.settings)).toEqual([
-    { power: true },
-    { brightness: 36 },
-  ]);
-  await expect(light.getByRole("slider", { name: "Brightness" })).toHaveValue("36");
 });
 
 test("accepted but unconfirmed commands settle to reported state with a warning across reloads", async ({

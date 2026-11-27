@@ -30,8 +30,7 @@ test("power changes immediately and stays pending through the confirmation snaps
   await power.click();
   await expect(power).not.toBeChecked();
   await expect(power).toHaveText("Off");
-  // Still editable while saving; further edits would be combined into the next change.
-  await expect(power).toBeEnabled();
+  await expect(power).toBeDisabled();
   await expect(fan.getByRole("status", { name: "Standing fan state" })).toContainText(
     "Waiting for device confirmation",
   );
